@@ -1,0 +1,6 @@
+{
+  "name": "KOOPAL CLASH",
+  "description": "Choreographed 3D five-fighter anime action battle with deterministic damage phases, parries, and stylized eliminations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

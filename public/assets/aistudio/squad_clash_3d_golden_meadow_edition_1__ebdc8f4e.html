@@ -1,0 +1,4245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SQUAD CLASH 3D — Golden Meadow Edition (120s Director's Cut)</title>
+  <!-- Tailwind CSS for responsive glassmorphism HUD and modals -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js r128 via CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Google Fonts: Inter & Rajdhani for sleek anime HUD typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Rajdhani:wght@600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b1120;
+      font-family: 'Inter', sans-serif;
+      color: #f8fafc;
+    }
+    .font-display {
+      font-family: 'Rajdhani', sans-serif;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+      touch-action: none;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Lightweight high-contrast manga impact flash (zero backdrop-filter lag) */
+    #manga-flash {
+      position: fixed;
+      inset: 0;
+      z-index: 15;
+      pointer-events: none;
+      opacity: 0;
+      background: #ffffff;
+      mix-blend-mode: difference;
+      transition: opacity 0.03s linear;
+    }
+
+    /* Subtle cinematic letterbox vignette */
+    #cinematic-vignette {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+      background: radial-gradient(circle at 50% 48%, rgba(0,0,0,0) 58%, rgba(8, 12, 24, 0.42) 100%);
+    }
+
+    /* Glassmorphism panels */
+    .glass-panel {
+      background: rgba(12, 18, 32, 0.68);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.38);
+    }
+
+    /* Custom range slider for 120s timeline scrubber */
+    input[type="range"].timeline-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.18);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"].timeline-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #facc15;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 12px rgba(250, 204, 21, 0.95);
+      cursor: pointer;
+      transition: transform 0.12s ease;
+    }
+    input[type="range"].timeline-slider::-webkit-slider-thumb:hover {
+      transform: scale(1.22);
+    }
+
+    /* Champion Banner animation */
+    @keyframes championPulse {
+      0%, 100% { transform: translate(-50%, 0) scale(1); filter: drop-shadow(0 0 18px rgba(250, 204, 21, 0.75)); }
+      50% { transform: translate(-50%, -3px) scale(1.03); filter: drop-shadow(0 0 32px rgba(250, 204, 21, 1)); }
+    }
+    .champion-banner-anim {
+      animation: championPulse 2.2s ease-in-out infinite;
+    }
+
+    /* Impact Callout pop animation */
+    @keyframes calloutPop {
+      0% { transform: translate(-50%, -50%) scale(0.4) rotate(-6deg); opacity: 0; }
+      22% { transform: translate(-50%, -50%) scale(1.18) rotate(2deg); opacity: 1; }
+      76% { transform: translate(-50%, -50%) scale(1.0) rotate(0deg); opacity: 1; }
+      100% { transform: translate(-50%, -62%) scale(0.92); opacity: 0; }
+    }
+    .callout-active {
+      animation: calloutPop 0.95s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    /* Custom scrollbar for code modal */
+    pre::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    pre::-webkit-scrollbar-thumb {
+      background: rgba(250, 204, 21, 0.4);
+      border-radius: 999px;
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D Viewport Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Cinematic Vignette & Manga Impact Flash Overlay -->
+  <div id="cinematic-vignette"></div>
+  <div id="manga-flash"></div>
+
+  <!-- Dynamic Center-Screen Impact Callout -->
+  <div id="impact-callout" class="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none hidden">
+    <div id="impact-callout-text" class="font-display font-extrabold italic tracking-wider text-3xl sm:text-6xl px-5 sm:px-7 py-2 rounded-2xl border-2 border-white/80 shadow-2xl text-white uppercase whitespace-nowrap">
+      CLASH!
+    </div>
+  </div>
+
+  <!-- Act 8 Champion Victory Banner -->
+  <div id="champion-banner" class="fixed top-24 sm:top-28 left-1/2 -translate-x-1/2 z-20 pointer-events-none hidden champion-banner-anim">
+    <div class="px-6 sm:px-10 py-2.5 sm:py-3 rounded-2xl bg-gradient-to-r from-amber-600/90 via-yellow-500/95 to-amber-600/90 border-2 border-yellow-200 shadow-2xl text-center">
+      <div class="text-[10px] sm:text-xs font-bold tracking-[0.35em] text-amber-950 uppercase">Golden Meadow Battle Royale</div>
+      <div class="font-display font-extrabold text-2xl sm:text-4xl tracking-wider text-slate-950 drop-shadow-sm">
+        👑 CHAMPION: JM 👑
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP HUD: Fighter Status Cards & Act Indicator -->
+  <header class="fixed top-0 left-0 right-0 z-20 p-2 sm:p-3.5 pointer-events-none flex flex-col gap-2">
+    <!-- Fighter Cards Row -->
+    <div id="fighter-hud-row" class="max-w-6xl mx-auto w-full grid grid-cols-5 gap-1.5 sm:gap-2.5 pointer-events-auto">
+      <!-- Populated dynamically by JS for MARJOHN, PRIME, DAMEN, KHEN, JM -->
+    </div>
+
+    <!-- Act Badge & Timer Pill -->
+    <div class="max-w-6xl mx-auto w-full flex items-center justify-between px-1">
+      <div class="glass-panel px-3 py-1 rounded-full flex items-center gap-2">
+        <span id="act-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="act-badge-text" class="font-display font-bold text-xs sm:text-sm tracking-wider text-amber-200 uppercase">
+          ACT 1 • CHARACTER INTRODUCTIONS
+        </span>
+      </div>
+
+      <div class="glass-panel px-3 py-1 rounded-full flex items-center gap-2 text-xs font-semibold text-slate-200">
+        <span id="time-display" class="font-mono text-amber-300">000.0s</span>
+        <span class="text-slate-400">/</span>
+        <span class="font-mono text-slate-300">120.0s</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- BOTTOM GLASSMORPHISM CONTROL DOCK -->
+  <footer class="fixed bottom-0 left-0 right-0 z-20 p-2 sm:p-3.5 pointer-events-none">
+    <div class="max-w-5xl mx-auto glass-panel rounded-2xl p-2.5 sm:p-3.5 pointer-events-auto flex flex-col gap-2.5">
+      <!-- Timeline Scrubber with 8 Act Markers (0 to 120s) -->
+      <div class="relative w-full pt-1 pb-2">
+        <input id="timeline-scrubber" type="range" min="0" max="120" step="0.02" value="0" class="timeline-slider" aria-label="120 second battle timeline scrubber" />
+        <div id="act-markers" class="relative w-full h-3 mt-1 text-[9px] sm:text-[10px] font-semibold text-slate-300">
+          <!-- Populated dynamically with clickable Act markers -->
+        </div>
+      </div>
+
+      <!-- Controls Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <!-- Left: Play/Pause & Replay -->
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <button id="btn-play-pause" class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 active:scale-95 text-slate-950 font-bold text-xs sm:text-sm flex items-center gap-1.5 shadow-lg transition cursor-pointer">
+            <span id="play-pause-icon">❚❚</span>
+            <span id="play-pause-label">Pause</span>
+          </button>
+          <button id="btn-replay" class="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white font-semibold text-xs sm:text-sm flex items-center gap-1 transition cursor-pointer" title="Replay from 0.0s">
+            <span>↺</span>
+            <span class="hidden sm:inline">Replay</span>
+          </button>
+        </div>
+
+        <!-- Center: Speed Toggles -->
+        <div class="flex items-center gap-1 bg-slate-950/50 p-1 rounded-xl border border-white/10">
+          <span class="text-[10px] uppercase tracking-wider text-slate-400 px-1.5 hidden md:inline">Speed</span>
+          <button data-speed="0.5" class="speed-btn px-2 py-1 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer">0.5x</button>
+          <button data-speed="1" class="speed-btn px-2 py-1 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer">1x</button>
+          <button data-speed="1.35" class="speed-btn px-2 py-1 rounded-lg text-xs font-bold bg-amber-400 text-slate-950 transition cursor-pointer">1.35x (Action)</button>
+          <button data-speed="2" class="speed-btn px-2 py-1 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer">2x</button>
+        </div>
+
+        <!-- Right: Camera Mode, Audio Toggle, Node.js Export -->
+        <div class="flex items-center gap-1.5 sm:gap-2">
+          <div class="flex items-center bg-slate-950/50 p-1 rounded-xl border border-white/10">
+            <button data-cam="auto" class="cam-btn px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold bg-sky-400 text-slate-950 transition cursor-pointer">Auto Director</button>
+            <button data-cam="orbit" class="cam-btn px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer">Free Orbit</button>
+            <button data-cam="jm" class="cam-btn px-2 sm:px-2.5 py-1 rounded-lg text-xs font-bold text-slate-300 hover:text-white transition cursor-pointer">Track JM</button>
+          </div>
+
+          <button id="btn-audio" class="px-2.5 sm:px-3 py-2 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-xs font-bold text-slate-200 flex items-center gap-1.5 border border-white/10 transition cursor-pointer" title="Toggle Web Audio SFX & Wind">
+            <span id="audio-icon">🔇</span>
+            <span class="hidden md:inline" id="audio-label">Audio Off</span>
+          </button>
+
+          <button id="btn-node-modal" class="px-2.5 sm:px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/35 border border-emerald-400/40 active:scale-95 text-emerald-200 text-xs font-bold flex items-center gap-1.5 transition cursor-pointer">
+            <span>&lt;/&gt;</span>
+            <span class="hidden sm:inline">Node.js Code</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Toast Notification (Replaces alert) -->
+  <div id="toast-box" class="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-emerald-500 text-slate-950 font-bold text-xs sm:text-sm shadow-2xl opacity-0 pointer-events-none transition-opacity duration-200">
+    Copied to clipboard!
+  </div>
+
+  <!-- Node.js Server Export Modal -->
+  <div id="node-modal" class="fixed inset-0 z-40 bg-slate-950/75 backdrop-blur-md hidden items-center justify-center p-3 sm:p-6">
+    <div class="glass-panel rounded-2xl max-w-2xl w-full p-4 sm:p-6 border border-white/20 flex flex-col gap-4 max-h-[88vh]">
+      <div class="flex items-center justify-between border-b border-white/10 pb-3">
+        <div>
+          <h2 class="font-display font-bold text-xl sm:text-2xl text-amber-300">Zero-Dependency Node.js Server</h2>
+          <p class="text-xs text-slate-300">Save as <code class="text-emerald-300">squad-clash-server.js</code> alongside <code class="text-emerald-300">index.html</code> and run <code class="text-amber-200">node squad-clash-server.js</code></p>
+        </div>
+        <button id="btn-close-modal" class="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold flex items-center justify-center cursor-pointer">✕</button>
+      </div>
+
+      <pre id="node-code-block" class="bg-slate-950/90 border border-white/10 rounded-xl p-3.5 text-xs font-mono text-emerald-300 overflow-auto max-h-[48vh] leading-relaxed"></pre>
+
+      <div class="flex flex-wrap items-center justify-end gap-2 pt-1">
+        <button id="btn-copy-node" class="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs sm:text-sm transition cursor-pointer">
+          Copy Code
+        </button>
+        <button id="btn-download-node" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm transition cursor-pointer">
+          Download squad-clash-server.js
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ============================================================================
+     * SQUAD CLASH 3D — GOLDEN MEADOW EDITION (120-SECOND DIRECTOR'S CUT)
+     * Single-file Three.js (r128) + Tailwind CSS anime battle royale motion graphic
+     * featuring:
+     * - Deterministic 120.0s (2-minute) 8-act Combat Gods-inspired choreography
+     * - Full multi-joint articulated rigs (pelvis, torso twist/pitch/roll, head,
+     *   shoulders, elbows, forearms, hands/weapons, thighs, knees, shins, boots)
+     * - Distinct movement languages for all 5 fighters (Marjohn, Prime, Damen, Khen, JM)
+     * - Substantial 3D environmental destruction across multiple terrain zones:
+     *   1) Western Ruined Stone Temple (archway, columns & lintels fracture at 40.5s)
+     *   2) Eastern Jagged Highland Cliff (rock outcrop slabs avalanche at 56.5s)
+     *   3) Northern Reflective Stream (3D splash plumes & expanding ripples in Act 5)
+     *   4) Multiple destructible boulders & persistent scorched-earth craters
+     * - Locked 60 FPS performance: static 110-tuft perimeter grass, cached eye
+     *   textures, reusable object pools, and deterministic scrubbing at any second.
+     * ============================================================================
+     */
+
+    const TOTAL_DURATION = 120.0;
+
+    // --------------------------------------------------------------------------
+    // 1. SPRING-DAMPER PHYSICS & BIOMECHANICAL POSE HELPERS
+    // --------------------------------------------------------------------------
+    class Spring1D {
+      constructor(initial = 0, stiffness = 220, damping = 18) {
+        this.value = initial;
+        this.target = initial;
+        this.velocity = 0;
+        this.stiffness = stiffness;
+        this.damping = damping;
+      }
+      reset(val = 0) {
+        this.value = val;
+        this.target = val;
+        this.velocity = 0;
+      }
+      impulse(dv) {
+        this.velocity += dv;
+      }
+      update(dt) {
+        const clampedDt = Math.min(dt, 0.05);
+        const force = (this.target - this.value) * this.stiffness;
+        const damp = this.velocity * this.damping;
+        this.velocity += (force - damp) * clampedDt;
+        this.value += this.velocity * clampedDt;
+        return this.value;
+      }
+    }
+
+    class Spring3D {
+      constructor(x = 0, y = 0, z = 0, stiffness = 220, damping = 18) {
+        this.x = new Spring1D(x, stiffness, damping);
+        this.y = new Spring1D(y, stiffness, damping);
+        this.z = new Spring1D(z, stiffness, damping);
+      }
+      setTarget(x, y, z) {
+        this.x.target = x;
+        this.y.target = y;
+        this.z.target = z;
+      }
+      reset(x, y, z) {
+        this.x.reset(x);
+        this.y.reset(y);
+        this.z.reset(z);
+      }
+      update(dt) {
+        this.x.update(dt);
+        this.y.update(dt);
+        this.z.update(dt);
+      }
+    }
+
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const lerp = (a, b, t) => a + (b - a) * clamp(t, 0, 1);
+    const smoothstep = (e0, e1, x) => {
+      const t = clamp((x - e0) / (e1 - e0), 0, 1);
+      return t * t * (3 - 2 * t);
+    };
+
+    /**
+     * Biomechanical multi-joint running/sprinting stride pose.
+     */
+    function getRunStridePose(phase, intensity = 1.0) {
+      const s = Math.sin(phase);
+      const c = Math.cos(phase);
+      const thighSwing = 0.88 * intensity;
+      const armSwing = 0.76 * intensity;
+      return {
+        hipY: Math.abs(c) * 0.09 * intensity - 0.05 * intensity,
+        torsoPitch: 0.36 * intensity,
+        torsoYaw: -s * 0.24 * intensity,
+        thighL: [s * thighSwing, 0, -0.05],
+        kneeL: Math.max(0.12, -c * 1.18 * intensity + 0.35),
+        thighR: [-s * thighSwing, 0, 0.05],
+        kneeR: Math.max(0.12, c * 1.18 * intensity + 0.35),
+        armL: [-s * armSwing - 0.2, 0, -0.18],
+        elbowL: -0.95 - Math.max(0, -s) * 0.45,
+        armR: [s * armSwing - 0.2, 0, 0.18],
+        elbowR: -0.95 - Math.max(0, s) * 0.45
+      };
+    }
+
+    /**
+     * Grounded martial arts ready stance tailored per fighter weapon/personality.
+     */
+    function getMartialGuardPose(time, phaseOffset = 0, style = 'fist') {
+      const pulse = Math.sin(time * 5.0 + phaseOffset);
+      const crouch = 0.08 + pulse * 0.025;
+      const base = {
+        hipY: -crouch,
+        torsoPitch: 0.14,
+        torsoYaw: 0.22 + pulse * 0.05,
+        thighL: [-0.32 - pulse * 0.05, 0.15, -0.12],
+        kneeL: 0.52 + pulse * 0.08,
+        thighR: [0.24 - pulse * 0.05, -0.18, 0.14],
+        kneeR: 0.46 + pulse * 0.08,
+        armL: [-0.75 + pulse * 0.08, 0.25, -0.28],
+        elbowL: -1.35,
+        armR: [-0.55 - pulse * 0.08, -0.25, 0.28],
+        elbowR: -1.25
+      };
+      if (style === 'staff') {
+        base.armL = [-0.88, 0.48, -0.18];
+        base.elbowL = -1.05;
+        base.armR = [-0.42, -0.35, 0.32];
+        base.elbowR = -0.92;
+      } else if (style === 'heavy') {
+        base.hipY = -0.14 - pulse * 0.03;
+        base.torsoPitch = 0.24;
+        base.thighL = [-0.42, 0.18, -0.16];
+        base.kneeL = 0.72;
+        base.thighR = [0.34, -0.18, 0.18];
+        base.kneeR = 0.65;
+        base.armL = [-0.95, 0.35, -0.35];
+        base.elbowL = -1.45;
+        base.armR = [-0.85, -0.35, 0.35];
+        base.elbowR = -1.35;
+      } else if (style === 'guns') {
+        base.armL = [-0.95, 0.15, -0.32];
+        base.elbowL = -1.15;
+        base.armR = [-0.95, -0.15, 0.32];
+        base.elbowR = -1.15;
+      } else if (style === 'daggers') {
+        base.armL = [-0.65, 0.32, -0.35];
+        base.elbowL = -1.42;
+        base.armR = [-0.65, -0.32, 0.35];
+        base.elbowR = -1.42;
+      }
+      return base;
+    }
+
+    // --------------------------------------------------------------------------
+    // 2. DETERMINISTIC MULTI-ZONE HIGHLAND TERRAIN HEIGHT FUNCTION
+    // --------------------------------------------------------------------------
+    function getStreamZ(x) {
+      return -20.5 + 2.8 * Math.sin(x * 0.09);
+    }
+
+    function getTerrainHeight(x, z) {
+      const r = Math.sqrt(x * x + z * z);
+      // Central combat clearing & Western Temple terrace stay level for crisp footing
+      if (r < 13.5) {
+        return 0.03 * Math.sin(x * 0.45) * Math.cos(z * 0.45);
+      }
+      // Northern Stream channel depression along z ~ getStreamZ(x)
+      const streamCenterZ = getStreamZ(x);
+      const distToStream = Math.abs(z - streamCenterZ);
+      const streamCarve = distToStream < 4.4 ? -0.68 * Math.cos((distToStream / 4.4) * Math.PI * 0.5) : 0;
+
+      // Keep Western Temple plaza around (-16.5, -4.0) gently terraced
+      const distToTemple = Math.hypot(x + 16.5, z + 4.0);
+      const templeFlatten = 1.0 - smoothstep(4.5, 9.5, distToTemple);
+
+      // Eastern Highland Cliff plateau rise around (+18.5, -2.5)
+      const distToCliff = Math.hypot(x - 19.5, z + 2.5);
+      const cliffRise = (1.0 - smoothstep(3.0, 11.5, distToCliff)) * 2.4;
+
+      // Rolling meadow hills rising outside the central arena
+      const hillFactor = smoothstep(13.5, 60.0, r) * (1.0 - templeFlatten * 0.85);
+      const n1 = Math.sin(x * 0.055 + 0.4) * Math.cos(z * 0.055 - 0.3);
+      const n2 = Math.sin(x * 0.12 - z * 0.09) * 0.45;
+      const n3 = Math.cos(x * 0.22 + z * 0.18) * 0.18;
+      const ridgeBoost = smoothstep(44.0, 105.0, r) * 14.5;
+
+      return hillFactor * (7.0 * (n1 * 0.5 + 0.5) + n2 + n3) + ridgeBoost + streamCarve + cliffRise;
+    }
+
+    // --------------------------------------------------------------------------
+    // 3. FAST 512x512 PROCEDURAL PBR CANVAS TEXTURES
+    // --------------------------------------------------------------------------
+    function createMeadowTextures() {
+      const size = 512;
+      const albedoCanvas = document.createElement('canvas');
+      albedoCanvas.width = size;
+      albedoCanvas.height = size;
+      const aCtx = albedoCanvas.getContext('2d');
+
+      const bumpCanvas = document.createElement('canvas');
+      bumpCanvas.width = size;
+      bumpCanvas.height = size;
+      const bCtx = bumpCanvas.getContext('2d');
+
+      const baseGrad = aCtx.createRadialGradient(size * 0.5, size * 0.5, 10, size * 0.5, size * 0.5, size * 0.5);
+      baseGrad.addColorStop(0.0, '#6a7c38');
+      baseGrad.addColorStop(0.11, '#58782d');
+      baseGrad.addColorStop(0.32, '#437528');
+      baseGrad.addColorStop(0.68, '#366622');
+      baseGrad.addColorStop(1.0, '#2c541d');
+      aCtx.fillStyle = baseGrad;
+      aCtx.fillRect(0, 0, size, size);
+
+      bCtx.fillStyle = '#808080';
+      bCtx.fillRect(0, 0, size, size);
+
+      let seed = 1337;
+      const rand = () => {
+        seed = (seed * 16807) % 2147483647;
+        return (seed - 1) / 2147483646;
+      };
+
+      for (let i = 0; i < 180; i++) {
+        const px = rand() * size;
+        const py = rand() * size;
+        const rad = 8 + rand() * 26;
+        const isGolden = rand() > 0.42;
+        const grad = aCtx.createRadialGradient(px, py, 1, px, py, rad);
+        grad.addColorStop(0, isGolden ? 'rgba(163, 178, 54, 0.28)' : 'rgba(42, 102, 34, 0.32)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        aCtx.fillStyle = grad;
+        aCtx.beginPath();
+        aCtx.arc(px, py, rad, 0, Math.PI * 2);
+        aCtx.fill();
+      }
+
+      // Trampled earthen battle clearing in the center
+      const cx = size * 0.5;
+      const cy = size * 0.5;
+      const dirtGrad = aCtx.createRadialGradient(cx, cy, 4, cx, cy, 40);
+      dirtGrad.addColorStop(0, 'rgba(122, 99, 64, 0.80)');
+      dirtGrad.addColorStop(0.55, 'rgba(108, 96, 56, 0.52)');
+      dirtGrad.addColorStop(0.85, 'rgba(84, 104, 44, 0.22)');
+      dirtGrad.addColorStop(1, 'rgba(84, 104, 44, 0)');
+      aCtx.fillStyle = dirtGrad;
+      aCtx.beginPath();
+      aCtx.arc(cx, cy, 40, 0, Math.PI * 2);
+      aCtx.fill();
+
+      // Winding mossy cobblestone footpath connecting clearing to Western Temple & Southern Fence
+      aCtx.save();
+      aCtx.strokeStyle = 'rgba(136, 126, 104, 0.62)';
+      aCtx.lineWidth = 6;
+      aCtx.lineCap = 'round';
+      aCtx.beginPath();
+      aCtx.moveTo(size * 0.42, size * 0.48);
+      aCtx.lineTo(size * 0.56, size * 0.58);
+      aCtx.bezierCurveTo(size * 0.64, size * 0.66, size * 0.70, size * 0.76, size * 0.78, size * 0.86);
+      aCtx.stroke();
+      aCtx.restore();
+
+      for (let i = 0; i < 4200; i++) {
+        const x = rand() * size;
+        const y = rand() * size;
+        const len = 2 + rand() * 4.5;
+        const angle = -Math.PI * 0.5 + (rand() - 0.5) * 0.7;
+        const shade = rand();
+        aCtx.strokeStyle =
+          shade > 0.65
+            ? 'rgba(176, 194, 68, 0.45)'
+            : shade > 0.3
+            ? 'rgba(78, 134, 42, 0.48)'
+            : 'rgba(38, 82, 26, 0.45)';
+        aCtx.lineWidth = 1.0;
+        aCtx.beginPath();
+        aCtx.moveTo(x, y);
+        aCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+        aCtx.stroke();
+
+        const bVal = Math.floor(110 + rand() * 65);
+        bCtx.strokeStyle = `rgb(${bVal},${bVal},${bVal})`;
+        bCtx.beginPath();
+        bCtx.moveTo(x, y);
+        bCtx.lineTo(x + Math.cos(angle) * len, y + Math.sin(angle) * len);
+        bCtx.stroke();
+      }
+
+      const albedo = new THREE.CanvasTexture(albedoCanvas);
+      albedo.anisotropy = 4;
+      const bump = new THREE.CanvasTexture(bumpCanvas);
+      return { albedo, bump };
+    }
+
+    function createStoneAndBarkTextures() {
+      const sCanvas = document.createElement('canvas');
+      sCanvas.width = 128;
+      sCanvas.height = 128;
+      const sCtx = sCanvas.getContext('2d');
+      sCtx.fillStyle = '#6b7280';
+      sCtx.fillRect(0, 0, 128, 128);
+      for (let i = 0; i < 420; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 128;
+        const r = 1 + Math.random() * 3.5;
+        sCtx.fillStyle = Math.random() > 0.5 ? 'rgba(156,163,175,0.28)' : 'rgba(55,65,81,0.32)';
+        sCtx.beginPath();
+        sCtx.arc(x, y, r, 0, Math.PI * 2);
+        sCtx.fill();
+      }
+      for (let i = 0; i < 24; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 70;
+        const r = 4 + Math.random() * 11;
+        sCtx.fillStyle = 'rgba(77, 124, 15, 0.38)';
+        sCtx.beginPath();
+        sCtx.arc(x, y, r, 0, Math.PI * 2);
+        sCtx.fill();
+      }
+      const stoneTex = new THREE.CanvasTexture(sCanvas);
+
+      const bCanvas = document.createElement('canvas');
+      bCanvas.width = 64;
+      bCanvas.height = 128;
+      const bCtx = bCanvas.getContext('2d');
+      bCtx.fillStyle = '#4a3525';
+      bCtx.fillRect(0, 0, 64, 128);
+      for (let i = 0; i < 110; i++) {
+        const x = Math.random() * 64;
+        const y = Math.random() * 128;
+        bCtx.fillStyle = Math.random() > 0.5 ? '#362417' : '#5e4532';
+        bCtx.fillRect(x, y, 1.5 + Math.random() * 2, 8 + Math.random() * 14);
+      }
+      const barkTex = new THREE.CanvasTexture(bCanvas);
+      barkTex.wrapS = THREE.RepeatWrapping;
+      barkTex.wrapT = THREE.RepeatWrapping;
+
+      // Plaid flannel shirt texture for Damen
+      const pCanvas = document.createElement('canvas');
+      pCanvas.width = 128;
+      pCanvas.height = 128;
+      const pCtx = pCanvas.getContext('2d');
+      pCtx.fillStyle = '#991b1b';
+      pCtx.fillRect(0, 0, 128, 128);
+      pCtx.fillStyle = 'rgba(245, 158, 11, 0.45)';
+      for (let i = 0; i < 128; i += 16) {
+        pCtx.fillRect(i, 0, 6, 128);
+        pCtx.fillRect(0, i, 128, 6);
+      }
+      pCtx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+      for (let i = 8; i < 128; i += 16) {
+        pCtx.fillRect(i, 0, 3, 128);
+        pCtx.fillRect(0, i, 128, 3);
+      }
+      const plaidTex = new THREE.CanvasTexture(pCanvas);
+
+      // ID Badge texture for JM's school lanyard
+      const idCanvas = document.createElement('canvas');
+      idCanvas.width = 64;
+      idCanvas.height = 96;
+      const idCtx = idCanvas.getContext('2d');
+      idCtx.fillStyle = '#f8fafc';
+      idCtx.fillRect(0, 0, 64, 96);
+      idCtx.fillStyle = '#0284c7';
+      idCtx.fillRect(0, 0, 64, 20);
+      idCtx.fillStyle = '#facc15';
+      idCtx.fillRect(0, 20, 64, 5);
+      idCtx.fillStyle = '#cbd5e1';
+      idCtx.fillRect(10, 32, 22, 26);
+      idCtx.fillStyle = '#334155';
+      idCtx.fillRect(36, 36, 20, 4);
+      idCtx.fillRect(36, 44, 18, 4);
+      idCtx.fillRect(10, 68, 44, 5);
+      idCtx.fillRect(10, 78, 32, 4);
+      const idTex = new THREE.CanvasTexture(idCanvas);
+
+      return { stoneTex, barkTex, plaidTex, idTex };
+    }
+
+    // Cached Anime Eye CanvasTexture per fighter (redraws only on state change)
+    function createAnimeEyeTexture(irisColorHex) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      let currentState = '';
+
+      function drawState(state = 'normal') {
+        if (currentState === state) return false;
+        currentState = state;
+        ctx.clearRect(0, 0, 128, 128);
+        if (state === 'ko') {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 12;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(26, 26);
+          ctx.lineTo(102, 102);
+          ctx.moveTo(102, 26);
+          ctx.lineTo(26, 102);
+          ctx.stroke();
+          return true;
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(64, 64, 48, state === 'shock' ? 54 : 44, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        const irisR = state === 'shock' ? 22 : 30;
+        const grad = ctx.createRadialGradient(64, 60, 6, 64, 64, irisR);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.35, irisColorHex);
+        grad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(64, 64, irisR, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#090d16';
+        ctx.beginPath();
+        ctx.arc(64, 64, state === 'shock' ? 9 : 13, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(52, 50, 8, 0, Math.PI * 2);
+        ctx.arc(76, 74, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+        ctx.fillRect(10, 12, 108, state === 'fierce' ? 24 : 14);
+        return true;
+      }
+
+      drawState('normal');
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.userData = { drawState };
+      return tex;
+    }
+
+    // --------------------------------------------------------------------------
+    // 4. ENHANCED PROCEDURAL WEB AUDIO SYNTHESIZER (DISTINCT BATTLE CUES)
+    // --------------------------------------------------------------------------
+    class BattleAudioEngine {
+      constructor() {
+        this.enabled = false;
+        this.ctx = null;
+        this.windGain = null;
+        this.masterGain = null;
+        this.triggeredKeys = new Set();
+      }
+
+      reset() {
+        this.triggeredKeys.clear();
+      }
+
+      toggle() {
+        this.enabled = !this.enabled;
+        if (this.enabled) {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AudioCtx();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = 0.34;
+            this.masterGain.connect(this.ctx.destination);
+            this._startMeadowWindAmbience();
+          }
+          if (this.ctx.state === 'suspended') {
+            this.ctx.resume();
+          }
+          if (this.windGain) {
+            this.windGain.gain.setTargetAtTime(0.10, this.ctx.currentTime, 0.25);
+          }
+        } else if (this.windGain && this.ctx) {
+          this.windGain.gain.setTargetAtTime(0.0, this.ctx.currentTime, 0.15);
+        }
+        return this.enabled;
+      }
+
+      _startMeadowWindAmbience() {
+        const bufferSize = this.ctx.sampleRate * 2;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        let b0 = 0, b1 = 0, b2 = 0;
+        for (let i = 0; i < bufferSize; i++) {
+          const white = Math.random() * 2 - 1;
+          b0 = 0.997 * b0 + white * 0.029;
+          b1 = 0.985 * b1 + white * 0.032;
+          b2 = 0.950 * b2 + white * 0.048;
+          data[i] = (b0 + b1 + b2 + white * 0.02) * 0.5;
+        }
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.value = 380;
+        filter.Q.value = 1.4;
+
+        this.windGain = this.ctx.createGain();
+        this.windGain.gain.value = 0.10;
+
+        noise.connect(filter);
+        filter.connect(this.windGain);
+        this.windGain.connect(this.masterGain);
+        noise.start();
+      }
+
+      playEvent(key, type = 'whoosh') {
+        if (!this.enabled || !this.ctx || this.triggeredKeys.has(key)) return;
+        this.triggeredKeys.add(key);
+        const now = this.ctx.currentTime;
+
+        if (type === 'whoosh' || type === 'wind') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type === 'wind' ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(type === 'wind' ? 660 : 520, now);
+          osc.frequency.exponentialRampToValueAtTime(110, now + 0.22);
+          gain.gain.setValueAtTime(0.24, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        } else if (type === 'charge') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(140, now);
+          osc.frequency.exponentialRampToValueAtTime(640, now + 0.85);
+          gain.gain.setValueAtTime(0.02, now);
+          gain.gain.linearRampToValueAtTime(0.26, now + 0.65);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 0.92);
+        } else if (type === 'splash') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(420, now);
+          osc.frequency.exponentialRampToValueAtTime(180, now + 0.26);
+          gain.gain.setValueAtTime(0.28, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === 'shatter' || type === 'rockslide') {
+          // Multi-layered low rumble + crisp architectural stone cracks
+          for (let k = 0; k < 4; k++) {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = k % 2 === 0 ? 'sawtooth' : 'square';
+            const st = now + k * 0.06;
+            osc.frequency.setValueAtTime(190 - k * 25, st);
+            osc.frequency.exponentialRampToValueAtTime(32, st + 0.45);
+            gain.gain.setValueAtTime(0.36, st);
+            gain.gain.exponentialRampToValueAtTime(0.001, st + 0.48);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(st);
+            osc.stop(st + 0.5);
+          }
+        } else if (type === 'clash' || type === 'ko') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(type === 'ko' ? 165 : 130, now);
+          osc.frequency.exponentialRampToValueAtTime(34, now + 0.52);
+          gain.gain.setValueAtTime(0.55, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.54);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 0.56);
+
+          const clang = this.ctx.createOscillator();
+          const cGain = this.ctx.createGain();
+          clang.type = 'square';
+          clang.frequency.setValueAtTime(880, now);
+          clang.frequency.exponentialRampToValueAtTime(220, now + 0.26);
+          cGain.gain.setValueAtTime(0.22, now);
+          cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+          clang.connect(cGain);
+          cGain.connect(this.masterGain);
+          clang.start(now);
+          clang.stop(now + 0.3);
+        } else if (type === 'gunshot') {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(720, now);
+          osc.frequency.exponentialRampToValueAtTime(65, now + 0.14);
+          gain.gain.setValueAtTime(0.30, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.connect(gain);
+          gain.connect(this.masterGain);
+          osc.start(now);
+          osc.stop(now + 0.16);
+        } else if (type === 'beam') {
+          [220, 330, 440, 660].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = idx % 2 === 0 ? 'sawtooth' : 'sine';
+            osc.frequency.setValueAtTime(freq * 0.85, now);
+            osc.frequency.linearRampToValueAtTime(freq * 1.18, now + 1.4);
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.65);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(now);
+            osc.stop(now + 1.7);
+          });
+        } else if (type === 'victory') {
+          [261.63, 329.63, 392.0, 523.25, 659.25].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, now + idx * 0.07);
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.17, now + idx * 0.07 + 0.05);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 2.5);
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(now + idx * 0.07);
+            osc.stop(now + 2.6);
+          });
+        }
+      }
+    }
+
+    // --------------------------------------------------------------------------
+    // 5. MAIN APPLICATION & 60 FPS RENDERER SETUP
+    // --------------------------------------------------------------------------
+    window.onload = function () {
+      const container = document.getElementById('canvas-container');
+      const audioEngine = new BattleAudioEngine();
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.12;
+      container.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      const fog = new THREE.FogExp2(0xfde68a, 0.0056);
+      scene.fog = fog;
+
+      const camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 400);
+      camera.position.set(0, 6.5, 19);
+
+      // ------------------------------------------------------------------------
+      // 6. ATMOSPHERIC GLSL SKY DOME, GOD-RAYS, CLOUDS & MULTI-TIERED MOUNTAINS
+      // ------------------------------------------------------------------------
+      const skyUniforms = {
+        uZenithColor: { value: new THREE.Color('#1d4ed8') },
+        uMidSkyColor: { value: new THREE.Color('#f59e0b') },
+        uHorizonColor: { value: new THREE.Color('#fef08a') },
+        uSunDir: { value: new THREE.Vector3(-0.45, 0.28, -0.84).normalize() },
+        uStormFactor: { value: 0.0 },
+        uTime: { value: 0.0 }
+      };
+
+      const skyMat = new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        depthWrite: false,
+        uniforms: skyUniforms,
+        vertexShader: `
+          varying vec3 vWorldPos;
+          void main() {
+            vec4 wp = modelMatrix * vec4(position, 1.0);
+            vWorldPos = wp.xyz;
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }
+        `,
+        fragmentShader: `
+          uniform vec3 uZenithColor;
+          uniform vec3 uMidSkyColor;
+          uniform vec3 uHorizonColor;
+          uniform vec3 uSunDir;
+          uniform float uStormFactor;
+          uniform float uTime;
+          varying vec3 vWorldPos;
+
+          void main() {
+            vec3 dir = normalize(vWorldPos);
+            float h = clamp(dir.y, 0.0, 1.0);
+
+            vec3 zenith = mix(uZenithColor, vec3(0.08, 0.06, 0.20), uStormFactor);
+            vec3 mid = mix(uMidSkyColor, vec3(0.24, 0.11, 0.44), uStormFactor);
+            vec3 horizon = mix(uHorizonColor, vec3(0.48, 0.20, 0.65), uStormFactor);
+
+            vec3 col = mix(horizon, mid, smoothstep(0.0, 0.24, h));
+            col = mix(col, zenith, smoothstep(0.24, 0.82, h));
+
+            float sunDot = max(dot(dir, normalize(uSunDir)), 0.0);
+            float sunHalo = pow(sunDot, 12.0) * 0.45 + pow(sunDot, 160.0) * 1.4;
+            vec3 sunTint = mix(vec3(1.0, 0.92, 0.65), vec3(0.75, 0.45, 1.0), uStormFactor * 0.75);
+            col += sunTint * sunHalo * (1.0 - uStormFactor * 0.55);
+
+            float wisp = sin(dir.x * 14.0 + uTime * 0.12 + dir.z * 9.0) * cos(dir.z * 12.0 - uTime * 0.08);
+            col += sunTint * max(0.0, wisp) * 0.05 * smoothstep(0.1, 0.6, h);
+
+            gl_FragColor = vec4(col, 1.0);
+          }
+        `
+      });
+      scene.add(new THREE.Mesh(new THREE.SphereGeometry(210, 36, 24), skyMat));
+
+      const sunDisc = new THREE.Mesh(
+        new THREE.CircleGeometry(14, 28),
+        new THREE.MeshBasicMaterial({ color: 0xfffbeb, transparent: true, opacity: 0.92, fog: false })
+      );
+      sunDisc.position.set(-85, 52, -158);
+      sunDisc.lookAt(0, 0, 0);
+      scene.add(sunDisc);
+
+      const godRaysGroup = new THREE.Group();
+      scene.add(godRaysGroup);
+      const godRayMeshes = [];
+      for (let i = 0; i < 6; i++) {
+        const rayGeo = new THREE.CylinderGeometry(1.5, 11.5, 145, 12, 1, true);
+        const rayMat = new THREE.MeshBasicMaterial({
+          color: 0xfef08a,
+          transparent: true,
+          opacity: 0.065,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide,
+          depthWrite: false
+        });
+        const ray = new THREE.Mesh(rayGeo, rayMat);
+        ray.position.set(-45 + i * 18, 36, -85 + (i % 3) * 18);
+        ray.rotation.z = -0.44;
+        ray.rotation.x = 0.25;
+        godRaysGroup.add(ray);
+        godRayMeshes.push(ray);
+      }
+
+      const cloudsGroup = new THREE.Group();
+      scene.add(cloudsGroup);
+      const cloudMaterials = [];
+      for (let c = 0; c < 10; c++) {
+        const cloudCluster = new THREE.Group();
+        const cMat = new THREE.MeshStandardMaterial({
+          color: 0xfff7ed,
+          emissive: 0xfbbf24,
+          emissiveIntensity: 0.16,
+          roughness: 0.95
+        });
+        cloudMaterials.push(cMat);
+        const puffs = 3 + (c % 3);
+        for (let p = 0; p < puffs; p++) {
+          const puff = new THREE.Mesh(new THREE.SphereGeometry(3.2 + (p % 3) * 1.4, 10, 8), cMat);
+          puff.position.set((p - puffs * 0.5) * 3.4, Math.sin(p * 1.4) * 1.1, (p % 2) * 1.8);
+          puff.scale.set(1.4, 0.65, 1.0);
+          cloudCluster.add(puff);
+        }
+        const angle = (c / 10) * Math.PI * 2;
+        const radius = 62 + (c % 3) * 26;
+        cloudCluster.position.set(Math.cos(angle) * radius, 34 + (c % 4) * 5, Math.sin(angle) * radius);
+        cloudCluster.userData = { angle, radius, speed: 0.008 + (c % 3) * 0.003 };
+        cloudsGroup.add(cloudCluster);
+      }
+
+      function buildMountainRing(radius, baseHeight, peakHeight, segments, colorHex, snowCaps = false) {
+        const geo = new THREE.CylinderGeometry(radius, radius + 24, baseHeight, segments, 4, true);
+        const pos = geo.attributes.position;
+        const colors = new Float32Array(pos.count * 3);
+        const baseCol = new THREE.Color(colorHex);
+        const peakCol = snowCaps ? new THREE.Color('#f8fafc') : new THREE.Color(colorHex).offsetHSL(0.02, -0.05, 0.12);
+
+        for (let i = 0; i < pos.count; i++) {
+          const vx = pos.getX(i);
+          const vy = pos.getY(i);
+          const vz = pos.getZ(i);
+          const ang = Math.atan2(vz, vx);
+          const normY = (vy + baseHeight * 0.5) / baseHeight;
+
+          if (normY > 0.1) {
+            const ridge =
+              Math.abs(Math.sin(ang * 7.0 + radius * 0.1)) * 0.55 +
+              Math.abs(Math.cos(ang * 15.0 - 0.8)) * 0.30 +
+              Math.sin(ang * 29.0) * 0.15;
+            pos.setY(i, vy + normY * ridge * peakHeight);
+          }
+          const tCol = smoothstep(0.55, 0.95, normY);
+          const c = baseCol.clone().lerp(peakCol, tCol);
+          colors[i * 3] = c.r;
+          colors[i * 3 + 1] = c.g;
+          colors[i * 3 + 2] = c.b;
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.computeVertexNormals();
+        const mat = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.9,
+          side: THREE.DoubleSide
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.y = baseHeight * 0.36;
+        scene.add(mesh);
+        return mesh;
+      }
+
+      buildMountainRing(88, 22, 16, 72, '#365314', false);
+      buildMountainRing(118, 34, 26, 84, '#3f6212', false);
+      buildMountainRing(152, 48, 38, 96, '#475569', true);
+
+      // ------------------------------------------------------------------------
+      // 7. LIGHTING (GOLDEN SUNLIGHT SHADOWS, HEMISPHERE FILL, DYNAMIC FX LIGHTS)
+      // ------------------------------------------------------------------------
+      const hemiLight = new THREE.HemisphereLight(0x93c5fd, 0x3f6212, 0.82);
+      scene.add(hemiLight);
+
+      const sunLight = new THREE.DirectionalLight(0xffedd5, 1.85);
+      sunLight.position.set(-28, 34, -36);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 1024;
+      sunLight.shadow.mapSize.height = 1024;
+      sunLight.shadow.camera.near = 2;
+      sunLight.shadow.camera.far = 115;
+      const shadowBound = 28;
+      sunLight.shadow.camera.left = -shadowBound;
+      sunLight.shadow.camera.right = shadowBound;
+      sunLight.shadow.camera.top = shadowBound;
+      sunLight.shadow.camera.bottom = -shadowBound;
+      sunLight.shadow.bias = -0.0006;
+      scene.add(sunLight);
+
+      const rimLight = new THREE.DirectionalLight(0xfde68a, 0.55);
+      rimLight.position.set(24, 14, 28);
+      scene.add(rimLight);
+
+      const actionPointLight = new THREE.PointLight(0xfacc15, 0, 26);
+      actionPointLight.position.set(0, 3, 0);
+      scene.add(actionPointLight);
+
+      // ------------------------------------------------------------------------
+      // 8. SCULPTED TERRAIN, STREAM, DESTRUCTIBLE TEMPLE RUINS & CLIFF OUTCROP
+      // ------------------------------------------------------------------------
+      const meadowTextures = createMeadowTextures();
+      const { stoneTex, barkTex, plaidTex, idTex } = createStoneAndBarkTextures();
+
+      const terrainGeo = new THREE.PlaneGeometry(220, 220, 104, 104);
+      terrainGeo.rotateX(-Math.PI / 2);
+      const tPos = terrainGeo.attributes.position;
+      for (let i = 0; i < tPos.count; i++) {
+        const vx = tPos.getX(i);
+        const vz = tPos.getZ(i);
+        tPos.setY(i, getTerrainHeight(vx, vz));
+      }
+      terrainGeo.computeVertexNormals();
+
+      const terrainMat = new THREE.MeshStandardMaterial({
+        map: meadowTextures.albedo,
+        bumpMap: meadowTextures.bump,
+        bumpScale: 0.12,
+        roughness: 0.88,
+        metalness: 0.02
+      });
+      const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+      terrainMesh.receiveShadow = true;
+      scene.add(terrainMesh);
+
+      // Northern Reflective Stream along z ~ -20.5
+      const streamGeo = new THREE.PlaneGeometry(130, 5.2, 48, 2);
+      streamGeo.rotateX(-Math.PI / 2);
+      const sPos = streamGeo.attributes.position;
+      for (let i = 0; i < sPos.count; i++) {
+        const sx = sPos.getX(i);
+        const sz = sPos.getZ(i);
+        const curveZ = getStreamZ(sx);
+        sPos.setZ(i, sz + curveZ);
+        sPos.setY(i, getTerrainHeight(sx, sz + curveZ) + 0.18);
+      }
+      streamGeo.computeVertexNormals();
+      const streamMat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        emissive: 0x0284c7,
+        emissiveIntensity: 0.25,
+        roughness: 0.12,
+        metalness: 0.78,
+        transparent: true,
+        opacity: 0.85
+      });
+      scene.add(new THREE.Mesh(streamGeo, streamMat));
+
+      // Wind-Swaying Perimeter Grove of Trees (22 trees)
+      const swayingTrees = [];
+      const barkMat = new THREE.MeshStandardMaterial({ map: barkTex, roughness: 0.92 });
+      const canopyMats = [
+        new THREE.MeshStandardMaterial({ color: 0x4d7c0f, roughness: 0.85 }),
+        new THREE.MeshStandardMaterial({ color: 0x65a30d, roughness: 0.85 }),
+        new THREE.MeshStandardMaterial({ color: 0xa16207, roughness: 0.85 })
+      ];
+
+      for (let t = 0; t < 22; t++) {
+        const ang = (t / 22) * Math.PI * 2 + 0.14;
+        const dist = 27 + (t % 4) * 9.5;
+        const tx = Math.cos(ang) * dist;
+        const tz = Math.sin(ang) * dist;
+        if (Math.abs(tz - getStreamZ(tx)) < 4.5) continue;
+
+        const ty = getTerrainHeight(tx, tz);
+        const treeGroup = new THREE.Group();
+        treeGroup.position.set(tx, ty, tz);
+
+        const scale = 0.85 + (t % 3) * 0.28;
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.24 * scale, 0.44 * scale, 4.2 * scale, 7), barkMat);
+        trunk.position.y = 2.1 * scale;
+        trunk.castShadow = true;
+        treeGroup.add(trunk);
+
+        const crown = new THREE.Mesh(new THREE.DodecahedronGeometry(2.1 * scale, 1), canopyMats[t % canopyMats.length]);
+        crown.position.y = 4.6 * scale;
+        crown.scale.set(1.15, 0.85, 1.15);
+        treeGroup.add(crown);
+
+        scene.add(treeGroup);
+        swayingTrees.push({ group: treeGroup, crown, phase: t * 0.9 });
+      }
+
+      // Wooden Pasture Fence Segments along the southern meadow edge (Damen vaults over this in Act 1!)
+      for (let f = -4; f <= 4; f++) {
+        const fx = f * 3.4;
+        const fz = 14.5 + Math.sin(f * 0.5) * 0.8;
+        const fy = getTerrainHeight(fx, fz);
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.13, 1.35, 6), barkMat);
+        post.position.set(fx, fy + 0.65, fz);
+        post.castShadow = true;
+        scene.add(post);
+        if (f < 4) {
+          const rail = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.09, 0.08), barkMat);
+          rail.position.set(fx + 1.7, fy + 0.95, fz);
+          rail.castShadow = true;
+          scene.add(rail);
+          const railLow = rail.clone();
+          railLow.position.y = fy + 0.52;
+          scene.add(railLow);
+        }
+      }
+
+      // ------------------------------------------------------------------------
+      // 8A. DESTRUCTIBLE WESTERN RUINED STONE TEMPLE (SHATTERS AT t = 40.5s)
+      // ------------------------------------------------------------------------
+      const stoneMat = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.88 });
+      const templeBlocks = [];
+      const templeOrigin = new THREE.Vector3(-16.2, getTerrainHeight(-16.2, -3.5), -3.5);
+
+      function addTempleBlock(dx, dy, dz, w, h, d, isDestructible, vx, vy, vz, rx, rz) {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), stoneMat);
+        const ox = templeOrigin.x + dx;
+        const oy = templeOrigin.y + dy;
+        const oz = templeOrigin.z + dz;
+        mesh.position.set(ox, oy, oz);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+        templeBlocks.push({
+          mesh,
+          origin: new THREE.Vector3(ox, oy, oz),
+          halfH: h * 0.5,
+          isDestructible,
+          vx,
+          vy,
+          vz,
+          rx,
+          rz
+        });
+      }
+
+      // Stepped stone foundation platform (persistent base)
+      addTempleBlock(0, 0.25, 0, 5.2, 0.5, 6.8, false, 0, 0, 0, 0, 0);
+      // Left & Right Stone Columns (Upper & Mid drums break away!)
+      addTempleBlock(0.6, 1.3, -1.8, 1.05, 1.6, 1.05, false, 0, 0, 0, 0, 0);
+      addTempleBlock(0.6, 2.9, -1.8, 1.0, 1.6, 1.0, true, -6.2, 4.5, -3.4, 2.4, -3.1);
+      addTempleBlock(0.6, 1.3, 1.8, 1.05, 1.6, 1.05, false, 0, 0, 0, 0, 0);
+      addTempleBlock(0.6, 2.9, 1.8, 1.0, 1.6, 1.0, true, -5.8, 5.2, 3.6, -2.8, 3.4);
+      // Heavy Stone Archway Lintel & Pediment Crown (shatters into 4 huge slabs!)
+      addTempleBlock(0.6, 4.15, -1.1, 1.25, 0.85, 2.3, true, -7.8, 6.5, -2.2, 3.5, -2.6);
+      addTempleBlock(0.6, 4.15,  1.1, 1.25, 0.85, 2.3, true, -8.4, 6.0,  2.5, -3.2, 2.9);
+      addTempleBlock(0.6, 4.95,  0.0, 1.15, 0.75, 3.2, true, -9.5, 7.8,  0.4, 4.1, -3.8);
+      // Back Sanctuary Wall Pillars
+      addTempleBlock(-1.6, 1.9, -2.2, 0.95, 2.8, 0.95, false, 0, 0, 0, 0, 0);
+      addTempleBlock(-1.6, 1.6,  2.2, 0.95, 2.2, 0.95, false, 0, 0, 0, 0, 0);
+
+      // ------------------------------------------------------------------------
+      // 8B. DESTRUCTIBLE EASTERN HIGHLAND CLIFF & ROCK OUTCROP (SHATTERS AT t = 56.5s)
+      // ------------------------------------------------------------------------
+      const cliffSlabs = [];
+      const cliffOrigin = new THREE.Vector3(18.5, getTerrainHeight(18.5, -2.0), -2.0);
+      const cliffMat = new THREE.MeshStandardMaterial({ map: stoneTex, color: 0x9ca3af, roughness: 0.92 });
+
+      // Solid Cliff Base Buttresses
+      [
+        [1.8, 2.2, -2.4, 3.2, 4.4, 3.4],
+        [2.2, 3.0,  1.8, 3.6, 6.0, 3.8],
+        [3.4, 4.2, -0.3, 3.0, 8.4, 5.5]
+      ].forEach(([dx, dy, dz, w, h, d]) => {
+        const baseMesh = new THREE.Mesh(new THREE.DodecahedronGeometry(Math.max(w, d) * 0.55, 1), cliffMat);
+        baseMesh.scale.set(w / 3.2, h / 3.2, d / 3.2);
+        baseMesh.position.set(cliffOrigin.x + dx, cliffOrigin.y + dy * 0.7, cliffOrigin.z + dz);
+        baseMesh.castShadow = true;
+        baseMesh.receiveShadow = true;
+        scene.add(baseMesh);
+      });
+
+      // 14 Fracturing Cliff Face Slabs that avalanche when Prime is slammed into the cliff!
+      for (let c = 0; c < 14; c++) {
+        const rad = 0.75 + (c % 4) * 0.28;
+        const slab = new THREE.Mesh(new THREE.DodecahedronGeometry(rad, 0), cliffMat);
+        const ox = cliffOrigin.x + 0.4 + (c % 3) * 0.65;
+        const oy = cliffOrigin.y + 1.1 + (c % 5) * 0.95;
+        const oz = cliffOrigin.z - 2.2 + (c / 14) * 4.4;
+        slab.position.set(ox, oy, oz);
+        slab.castShadow = true;
+        slab.receiveShadow = true;
+        scene.add(slab);
+        const ang = ((c / 14) - 0.5) * Math.PI * 0.85;
+        cliffSlabs.push({
+          mesh: slab,
+          origin: new THREE.Vector3(ox, oy, oz),
+          rad,
+          vx: -3.2 - (c % 4) * 1.4,
+          vy: 2.8 + (c % 3) * 1.6,
+          vz: Math.sin(ang) * 5.8,
+          rx: (c % 2 === 0 ? 1 : -1) * 3.4,
+          rz: (c % 3 - 1) * 2.9
+        });
+      }
+
+      // ------------------------------------------------------------------------
+      // 8C. DESTRUCTIBLE & ROLLING FIELD BOULDERS
+      // ------------------------------------------------------------------------
+      function createFieldBoulder(x, z, radius, shatterTime = 999) {
+        const y = getTerrainHeight(x, z);
+        const geo = new THREE.DodecahedronGeometry(radius, 1);
+        const pos = geo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const n = 0.84 + 0.28 * Math.sin(i * 3.7 + x);
+          pos.setXYZ(i, pos.getX(i) * n * 1.15, pos.getY(i) * n * 0.82, pos.getZ(i) * n);
+        }
+        geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, stoneMat);
+        mesh.position.set(x, y + radius * 0.55, z);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+
+        const shards = [];
+        for (let s = 0; s < 12; s++) {
+          const shard = new THREE.Mesh(new THREE.DodecahedronGeometry(radius * (0.22 + (s % 3) * 0.08), 0), stoneMat);
+          shard.visible = false;
+          shard.castShadow = true;
+          scene.add(shard);
+          const ang = (s / 12) * Math.PI * 2;
+          shards.push({
+            mesh: shard,
+            vx: Math.cos(ang) * (4.2 + (s % 3) * 1.5),
+            vy: 3.6 + (s % 4) * 1.2,
+            vz: Math.sin(ang) * (4.2 + (s % 3) * 1.5),
+            rx: (s % 2 === 0 ? 1 : -1) * 6.5,
+            rz: (s % 3 - 1) * 5.8
+          });
+        }
+        return { mesh, shards, origin: new THREE.Vector3(x, y + radius * 0.55, z), radius, shatterTime };
+      }
+
+      // Boulder 1: Shattered by Prime's Crimson Blaze punch at t = 46.2s
+      const primeShatterBoulder = createFieldBoulder(9.2, 4.2, 1.35, 46.2);
+      // Boulder 2: Damen's Cowboy Hat landing boulder in Act 5 (t = 74.2s)
+      const hatLandingBoulder = createFieldBoulder(11.4, 8.2, 1.15, 999);
+      // Boulder 3: Northern stream bank rock outcrop where Khen stands in Act 1
+      const khenIntroRock = createFieldBoulder(4.8, -14.8, 1.25, 999);
+      // Boulder 4: Rolling boulder pushed across clearing in Act 4 (t = 49.5s)
+      const rollingBoulder = createFieldBoulder(5.5, -5.8, 1.15, 999);
+
+      // ------------------------------------------------------------------------
+      // 9. ULTRA-LIGHTWEIGHT STATIC 110-TUFT OUTER GRASS (ZERO PER-FRAME CPU LAG)
+      // ------------------------------------------------------------------------
+      function buildSparseOuterGrass() {
+        const positions = new Float32Array([
+          -0.04, 0.0, 0.0,   0.04, 0.0, 0.0,   0.0, 0.42, 0.03,
+          -0.06, 0.0, 0.02, -0.01, 0.0, -0.02, -0.14, 0.34, 0.05,
+           0.01, 0.0, -0.02, 0.06, 0.0, 0.02,   0.14, 0.36, -0.04
+        ]);
+        const colors = new Float32Array([
+          0.25, 0.45, 0.14,  0.25, 0.45, 0.14,  0.68, 0.78, 0.24,
+          0.22, 0.42, 0.12,  0.22, 0.42, 0.12,  0.62, 0.74, 0.22,
+          0.24, 0.44, 0.13,  0.24, 0.44, 0.13,  0.66, 0.76, 0.24
+        ]);
+        const tuftGeo = new THREE.BufferGeometry();
+        tuftGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        tuftGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        tuftGeo.computeVertexNormals();
+
+        const tuftMat = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.75,
+          side: THREE.DoubleSide
+        });
+
+        const TUFT_COUNT = 110;
+        const instancedTufts = new THREE.InstancedMesh(tuftGeo, tuftMat, TUFT_COUNT);
+        const dummy = new THREE.Object3D();
+
+        const anchors = [
+          templeOrigin,
+          cliffOrigin,
+          hatLandingBoulder.origin,
+          khenIntroRock.origin,
+          new THREE.Vector3(-8.0, 0, 14.5),
+          new THREE.Vector3(0.0, 0, 14.5),
+          new THREE.Vector3(8.0, 0, 14.5)
+        ];
+
+        for (let i = 0; i < TUFT_COUNT; i++) {
+          const anchor = anchors[i % anchors.length];
+          const ang = (i * 2.39996) % (Math.PI * 2);
+          const dist = 1.4 + ((i * 7) % 24) * 0.12;
+          let gx = anchor.x + Math.cos(ang) * dist;
+          let gz = anchor.z + Math.sin(ang) * dist;
+          const centerR = Math.hypot(gx, gz);
+          if (centerR < 11.8) {
+            gx = (gx / Math.max(0.01, centerR)) * 12.6;
+            gz = (gz / Math.max(0.01, centerR)) * 12.6;
+          }
+          const gy = getTerrainHeight(gx, gz);
+          dummy.position.set(gx, gy - 0.02, gz);
+          dummy.rotation.set(0, (i * 1.7) % (Math.PI * 2), 0);
+          const s = 0.85 + (i % 5) * 0.18;
+          dummy.scale.set(s, s * (0.9 + (i % 3) * 0.2), s);
+          dummy.updateMatrix();
+          instancedTufts.setMatrixAt(i, dummy.matrix);
+        }
+        instancedTufts.instanceMatrix.needsUpdate = true;
+        scene.add(instancedTufts);
+      }
+      buildSparseOuterGrass();
+
+      // Lightweight Golden Pollen Motes
+      const POLLEN_COUNT = 120;
+      const pollenGeo = new THREE.BufferGeometry();
+      const pollenPos = new Float32Array(POLLEN_COUNT * 3);
+      for (let i = 0; i < POLLEN_COUNT; i++) {
+        pollenPos[i * 3] = (Math.random() - 0.5) * 52;
+        pollenPos[i * 3 + 1] = 0.6 + Math.random() * 9.0;
+        pollenPos[i * 3 + 2] = (Math.random() - 0.5) * 52;
+      }
+      pollenGeo.setAttribute('position', new THREE.BufferAttribute(pollenPos, 3));
+      const pollenMat = new THREE.PointsMaterial({
+        color: 0xfef08a,
+        size: 0.14,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending
+      });
+      scene.add(new THREE.Points(pollenGeo, pollenMat));
+
+      // ------------------------------------------------------------------------
+      // 10. FULL MULTI-JOINT ARTICULATED 3D ANIME FIGHTERS
+      // ------------------------------------------------------------------------
+      const FIGHTER_CONFIGS = [
+        { id: 'marjohn', name: 'MARJOHN', title: 'Azure Wind', color: '#38bdf8', hex: 0x38bdf8, startX: -6, koTime: 42.2 },
+        { id: 'prime',   name: 'PRIME',   title: 'Crimson Blaze', color: '#f43f5e', hex: 0xf43f5e, startX: -3, koTime: 58.2 },
+        { id: 'damen',   name: 'DAMEN',   title: 'Golden Outlaw', color: '#f59e0b', hex: 0xf59e0b, startX:  0, koTime: 75.0 },
+        { id: 'khen',    name: 'KHEN',    title: 'Arcane Violet', color: '#a855f7', hex: 0xa855f7, startX:  3, koTime: 109.0 },
+        { id: 'jm',      name: 'JM',      title: 'Golden Sovereign', color: '#facc15', hex: 0xfacc15, startX:  6, koTime: null }
+      ];
+
+      function createArticulatedFighter(cfg) {
+        const root = new THREE.Group();
+        root.position.set(cfg.startX, 0, 0);
+        scene.add(root);
+
+        const squashGroup = new THREE.Group();
+        root.add(squashGroup);
+
+        const skinMat = new THREE.MeshStandardMaterial({ color: 0xfde2c4, roughness: 0.55 });
+        const blackRobeMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.62 });
+        const goldTrimMat = new THREE.MeshStandardMaterial({
+          color: 0xfacc15,
+          emissive: 0xb45309,
+          emissiveIntensity: 0.25,
+          metalness: 0.72,
+          roughness: 0.28
+        });
+        const accentMat = new THREE.MeshStandardMaterial({
+          color: cfg.hex,
+          emissive: cfg.hex,
+          emissiveIntensity: 0.45,
+          roughness: 0.35
+        });
+
+        // Pelvis/Hips & Independently Articulated Spine/Torso
+        const hips = new THREE.Group();
+        hips.position.y = 0.92;
+        squashGroup.add(hips);
+
+        const torso = new THREE.Group();
+        hips.add(torso);
+
+        if (cfg.id === 'damen') {
+          const shirt = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.23, 0.20, 0.58, 12),
+            new THREE.MeshStandardMaterial({ map: plaidTex, roughness: 0.75 })
+          );
+          shirt.position.y = 0.29;
+          shirt.castShadow = true;
+          torso.add(shirt);
+
+          const leatherMat = new THREE.MeshStandardMaterial({ color: 0x5c3317, roughness: 0.68 });
+          const coatBack = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.26, 0.25, 0.62, 12, 1, false, Math.PI * 0.22, Math.PI * 1.56),
+            leatherMat
+          );
+          coatBack.position.y = 0.30;
+          coatBack.castShadow = true;
+          torso.add(coatBack);
+
+          const coatTail = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.48, 0.06), leatherMat);
+          coatTail.position.set(0, -0.18, -0.18);
+          coatTail.rotation.x = 0.18;
+          torso.add(coatTail);
+          cfg._coatTail = coatTail;
+        } else {
+          const robeChest = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.21, 0.60, 12), blackRobeMat);
+          robeChest.position.y = 0.30;
+          robeChest.castShadow = true;
+          torso.add(robeChest);
+
+          const trimCollar = new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.024, 8, 20), goldTrimMat);
+          trimCollar.rotation.x = Math.PI * 0.42;
+          trimCollar.position.set(0, 0.56, 0.03);
+          torso.add(trimCollar);
+
+          const robeSkirt = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.31, 0.44, 14), blackRobeMat);
+          robeSkirt.position.y = -0.16;
+          robeSkirt.castShadow = true;
+          hips.add(robeSkirt);
+
+          const skirtGoldHem = new THREE.Mesh(new THREE.TorusGeometry(0.305, 0.018, 8, 24), goldTrimMat);
+          skirtGoldHem.rotation.x = Math.PI * 0.5;
+          skirtGoldHem.position.y = -0.37;
+          hips.add(skirtGoldHem);
+
+          if (cfg.id === 'jm') {
+            const innerCollar = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.16, 0.17, 0.12, 12),
+              new THREE.MeshStandardMaterial({ color: 0x7dd3fc, roughness: 0.5 })
+            );
+            innerCollar.position.set(0, 0.58, 0.02);
+            torso.add(innerCollar);
+
+            const lanyardMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, metalness: 0.6, roughness: 0.3 });
+            const strapL = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.34, 0.015), lanyardMat);
+            strapL.position.set(-0.06, 0.41, 0.21);
+            strapL.rotation.z = -0.22;
+            torso.add(strapL);
+
+            const strapR = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.34, 0.015), lanyardMat);
+            strapR.position.set(0.06, 0.41, 0.21);
+            strapR.rotation.z = 0.22;
+            torso.add(strapR);
+
+            const idBadge = new THREE.Mesh(
+              new THREE.BoxGeometry(0.11, 0.16, 0.015),
+              new THREE.MeshStandardMaterial({ map: idTex, roughness: 0.35 })
+            );
+            idBadge.position.set(0, 0.21, 0.235);
+            torso.add(idBadge);
+            cfg._idBadge = idBadge;
+
+            const goldSash = new THREE.Mesh(new THREE.CylinderGeometry(0.235, 0.235, 0.11, 14), goldTrimMat);
+            goldSash.position.y = 0.03;
+            torso.add(goldSash);
+
+            const ribbonL = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.65, 0.015), goldTrimMat);
+            ribbonL.position.set(-0.14, -0.32, -0.22);
+            torso.add(ribbonL);
+            const ribbonR = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.65, 0.015), goldTrimMat);
+            ribbonR.position.set(0.14, -0.32, -0.22);
+            torso.add(ribbonR);
+            cfg._sashRibbons = [ribbonL, ribbonR];
+          }
+        }
+
+        // Head, Hair & Expressive Anime Eyes
+        const head = new THREE.Group();
+        head.position.y = 0.78;
+        torso.add(head);
+
+        const skull = new THREE.Mesh(new THREE.SphereGeometry(0.24, 16, 14), skinMat);
+        skull.castShadow = true;
+        head.add(skull);
+
+        const hairColor =
+          cfg.id === 'prime' ? 0x1f1218 :
+          cfg.id === 'khen'  ? 0x1e1b4b :
+          cfg.id === 'damen' ? 0x291d12 : 0x0f172a;
+        const hairMat = new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.55 });
+        const hairCap = new THREE.Mesh(new THREE.SphereGeometry(0.255, 14, 12, 0, Math.PI * 2, 0, Math.PI * 0.62), hairMat);
+        hairCap.rotation.x = -0.22;
+        head.add(hairCap);
+
+        for (let h = 0; h < 7; h++) {
+          const spike = new THREE.Mesh(new THREE.ConeGeometry(0.075, 0.24, 6), h % 2 === 0 ? hairMat : accentMat);
+          const ang = (h / 7) * Math.PI * 2;
+          spike.position.set(Math.cos(ang) * 0.17, 0.16, Math.sin(ang) * 0.17);
+          spike.rotation.z = -Math.cos(ang) * 0.65;
+          spike.rotation.x = Math.sin(ang) * 0.65;
+          head.add(spike);
+        }
+
+        const eyeTex = createAnimeEyeTexture(cfg.color);
+        const eyeMat = new THREE.MeshBasicMaterial({ map: eyeTex, transparent: true });
+        const eyeL = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 0.085), eyeMat);
+        eyeL.position.set(-0.082, 0.01, 0.232);
+        eyeL.rotation.y = -0.22;
+        head.add(eyeL);
+
+        const eyeR = new THREE.Mesh(new THREE.PlaneGeometry(0.085, 0.085), eyeMat);
+        eyeR.position.set(0.082, 0.01, 0.232);
+        eyeR.rotation.y = 0.22;
+        head.add(eyeR);
+
+        const browMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+        const browL = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.018, 0.015), browMat);
+        browL.position.set(-0.085, 0.065, 0.234);
+        browL.rotation.z = -0.22;
+        head.add(browL);
+
+        const browR = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.018, 0.015), browMat);
+        browR.position.set(0.085, 0.065, 0.234);
+        browR.rotation.z = 0.22;
+        head.add(browR);
+
+        // DAMEN: Detachable Wide-Brimmed Black Cowboy Hat
+        let cowboyHat = null;
+        if (cfg.id === 'damen') {
+          cowboyHat = new THREE.Group();
+          cowboyHat.position.set(0, 0.22, 0);
+          const hatBlack = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.72 });
+          const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.48, 0.025, 22), hatBlack);
+          brim.scale.set(1.0, 1.0, 1.15);
+          brim.castShadow = true;
+          cowboyHat.add(brim);
+
+          const crown = new THREE.Mesh(new THREE.CylinderGeometry(0.19, 0.22, 0.20, 16), hatBlack);
+          crown.position.y = 0.10;
+          crown.castShadow = true;
+          cowboyHat.add(crown);
+
+          const hatBand = new THREE.Mesh(new THREE.CylinderGeometry(0.225, 0.225, 0.032, 16), goldTrimMat);
+          hatBand.position.y = 0.025;
+          cowboyHat.add(hatBand);
+
+          head.add(cowboyHat);
+        }
+
+        // KHEN: Dark-rimmed rectangular 3D glasses + white anime cross-glint flare
+        let glassesGlint = null;
+        if (cfg.id === 'khen') {
+          const frameMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.3 });
+          const lensMat = new THREE.MeshStandardMaterial({
+            color: 0xe9d5ff,
+            emissive: 0xa855f7,
+            emissiveIntensity: 0.25,
+            transparent: true,
+            opacity: 0.55
+          });
+          [-0.084, 0.084].forEach((gx) => {
+            const rim = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.065, 0.015), frameMat);
+            rim.position.set(gx, 0.015, 0.246);
+            head.add(rim);
+            const lens = new THREE.Mesh(new THREE.PlaneGeometry(0.092, 0.048), lensMat);
+            lens.position.set(gx, 0.015, 0.255);
+            head.add(lens);
+          });
+          const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.014, 0.015), frameMat);
+          bridge.position.set(0, 0.022, 0.248);
+          head.add(bridge);
+
+          glassesGlint = new THREE.Group();
+          glassesGlint.position.set(0.085, 0.02, 0.265);
+          glassesGlint.visible = false;
+          const glintMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending
+          });
+          const barH = new THREE.Mesh(new THREE.PlaneGeometry(0.50, 0.035), glintMat);
+          const barV = new THREE.Mesh(new THREE.PlaneGeometry(0.035, 0.50), glintMat);
+          glassesGlint.add(barH, barV);
+          head.add(glassesGlint);
+        }
+
+        // TWO-SEGMENT ARTICULATED LIMBS (Shoulder->Elbow->Hand & Hip->Knee->Foot)
+        function createArticulatedLimb(isArm, side) {
+          const rootPivot = new THREE.Group();
+          const upperLen = isArm ? 0.27 : 0.40;
+          const lowerLen = isArm ? 0.26 : 0.39;
+          const radTop = isArm ? 0.074 : 0.105;
+          const radMid = isArm ? 0.065 : 0.088;
+          const radBot = isArm ? 0.056 : 0.076;
+
+          let limbMat = blackRobeMat;
+          if (!isArm && cfg.id === 'damen') {
+            limbMat = new THREE.MeshStandardMaterial({ color: 0x1d4ed8, roughness: 0.75 });
+          } else if (isArm && cfg.id === 'damen') {
+            limbMat = new THREE.MeshStandardMaterial({ color: 0x5c3317, roughness: 0.68 });
+          }
+
+          const upperMesh = new THREE.Mesh(new THREE.CylinderGeometry(radTop, radMid, upperLen, 10), limbMat);
+          upperMesh.position.y = -upperLen * 0.5;
+          upperMesh.castShadow = true;
+          rootPivot.add(upperMesh);
+
+          const jointSphere = new THREE.Mesh(new THREE.SphereGeometry(radMid * 0.96, 8, 8), limbMat);
+          jointSphere.position.y = -upperLen;
+          rootPivot.add(jointSphere);
+
+          const midPivot = new THREE.Group();
+          midPivot.position.y = -upperLen;
+          rootPivot.add(midPivot);
+
+          const lowerMesh = new THREE.Mesh(new THREE.CylinderGeometry(radMid, radBot, lowerLen, 10), limbMat);
+          lowerMesh.position.y = -lowerLen * 0.5;
+          lowerMesh.castShadow = true;
+          midPivot.add(lowerMesh);
+
+          if (!isArm && cfg.id === 'damen') {
+            const chapMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.72 });
+            const chapUpper = new THREE.Mesh(new THREE.BoxGeometry(0.045, upperLen * 0.9, 0.11), chapMat);
+            chapUpper.position.set(side * 0.088, -upperLen * 0.5, 0);
+            rootPivot.add(chapUpper);
+
+            const chapLower = new THREE.Mesh(new THREE.BoxGeometry(0.045, lowerLen * 0.9, 0.10), chapMat);
+            chapLower.position.set(side * 0.082, -lowerLen * 0.5, 0);
+            midPivot.add(chapLower);
+          }
+
+          const endMount = new THREE.Group();
+          endMount.position.y = -lowerLen;
+          midPivot.add(endMount);
+
+          if (isArm) {
+            if (cfg.id === 'prime') {
+              const gauntlet = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.21, 0.17), accentMat);
+              gauntlet.position.y = 0.02;
+              gauntlet.castShadow = true;
+              endMount.add(gauntlet);
+            } else {
+              const hand = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), skinMat);
+              endMount.add(hand);
+            }
+          } else {
+            if (cfg.id === 'jm') {
+              const sneaker = new THREE.Mesh(
+                new THREE.BoxGeometry(0.16, 0.11, 0.28),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35 })
+              );
+              sneaker.position.set(0, -0.04, 0.05);
+              sneaker.castShadow = true;
+              endMount.add(sneaker);
+            } else if (cfg.id === 'prime') {
+              const greave = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.24, 0.25), accentMat);
+              greave.position.set(0, 0.03, 0.03);
+              greave.castShadow = true;
+              endMount.add(greave);
+            } else {
+              const boot = new THREE.Mesh(
+                new THREE.BoxGeometry(0.15, 0.14, 0.26),
+                new THREE.MeshStandardMaterial({ color: cfg.id === 'damen' ? 0x451a03 : 0x090d16, roughness: 0.6 })
+              );
+              boot.position.set(0, -0.03, 0.04);
+              boot.castShadow = true;
+              endMount.add(boot);
+            }
+          }
+          return { rootPivot, midPivot, endMount };
+        }
+
+        const armLObj = createArticulatedLimb(true, -1);
+        armLObj.rootPivot.position.set(-0.31, 0.52, 0);
+        torso.add(armLObj.rootPivot);
+
+        const armRObj = createArticulatedLimb(true, 1);
+        armRObj.rootPivot.position.set(0.31, 0.52, 0);
+        torso.add(armRObj.rootPivot);
+
+        const legLObj = createArticulatedLimb(false, -1);
+        legLObj.rootPivot.position.set(-0.13, -0.04, 0);
+        hips.add(legLObj.rootPivot);
+
+        const legRObj = createArticulatedLimb(false, 1);
+        legRObj.rootPivot.position.set(0.13, -0.04, 0);
+        hips.add(legRObj.rootPivot);
+
+        // Signature Weapons Attached to Articulated Hand Mounts
+        const weapons = {};
+
+        if (cfg.id === 'marjohn') {
+          const staffGroup = new THREE.Group();
+          armRObj.endMount.add(staffGroup);
+
+          const shaft = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.028, 0.028, 2.25, 10),
+            new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.6, roughness: 0.3 })
+          );
+          shaft.rotation.x = Math.PI * 0.5;
+          staffGroup.add(shaft);
+
+          const cap1 = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.035, 0.18, 10), accentMat);
+          cap1.rotation.x = Math.PI * 0.5;
+          cap1.position.z = 1.12;
+          const cap2 = cap1.clone();
+          cap2.position.z = -1.12;
+          staffGroup.add(cap1, cap2);
+
+          const windRibbonMat = new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0.78,
+            side: THREE.DoubleSide
+          });
+          const ribbon1 = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.85), windRibbonMat);
+          ribbon1.position.set(0, -0.42, 1.08);
+          const ribbon2 = ribbon1.clone();
+          ribbon2.position.set(0, -0.42, -1.08);
+          staffGroup.add(ribbon1, ribbon2);
+
+          weapons.staff = staffGroup;
+          weapons.ribbons = [ribbon1, ribbon2];
+        } else if (cfg.id === 'damen') {
+          [armLObj.endMount, armRObj.endMount].forEach((mount, idx) => {
+            const rev = new THREE.Group();
+            const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.065, 0.28), goldTrimMat);
+            barrel.position.set(0, -0.02, 0.14);
+            const grip = new THREE.Mesh(new THREE.BoxGeometry(0.042, 0.13, 0.06), barkMat);
+            grip.position.set(0, -0.07, 0.02);
+            grip.rotation.x = 0.25;
+            rev.add(barrel, grip);
+            mount.add(rev);
+            weapons[idx === 0 ? 'revL' : 'revR'] = rev;
+          });
+        } else if (cfg.id === 'khen') {
+          [armLObj.endMount, armRObj.endMount].forEach((mount, idx) => {
+            const dag = new THREE.Group();
+            const hilt = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.16, 8), goldTrimMat);
+            hilt.rotation.x = Math.PI * 0.5;
+            const guard = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.025, 0.025), goldTrimMat);
+            guard.position.z = 0.08;
+            const blade = new THREE.Mesh(new THREE.ConeGeometry(0.036, 0.44, 4), accentMat);
+            blade.rotation.x = Math.PI * 0.5;
+            blade.position.z = 0.30;
+            dag.add(hilt, guard, blade);
+            mount.add(dag);
+            weapons[idx === 0 ? 'dagL' : 'dagR'] = dag;
+          });
+        }
+
+        // Elemental Aura Ring at feet
+        const auraRing = new THREE.Mesh(
+          new THREE.RingGeometry(0.45, 0.88, 28),
+          new THREE.MeshBasicMaterial({
+            color: cfg.hex,
+            transparent: true,
+            opacity: 0.0,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        auraRing.rotation.x = -Math.PI * 0.5;
+        auraRing.position.y = 0.04;
+        root.add(auraRing);
+
+        // JM's Golden Sovereign Crown Halo (Acts 7–8)
+        let crownHalo = null;
+        if (cfg.id === 'jm') {
+          crownHalo = new THREE.Group();
+          crownHalo.position.set(0, 1.95, -0.18);
+          crownHalo.visible = false;
+          const haloMat = new THREE.MeshBasicMaterial({
+            color: 0xfef08a,
+            transparent: true,
+            opacity: 0.92,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+          });
+          const outerRing = new THREE.Mesh(new THREE.RingGeometry(0.65, 0.76, 36), haloMat);
+          const innerRing = new THREE.Mesh(new THREE.RingGeometry(0.42, 0.47, 28), haloMat);
+          crownHalo.add(outerRing, innerRing);
+          for (let sp = 0; sp < 8; sp++) {
+            const ray = new THREE.Mesh(new THREE.PlaneGeometry(0.06, 0.48), haloMat);
+            const a = (sp / 8) * Math.PI * 2;
+            ray.position.set(Math.cos(a) * 0.92, Math.sin(a) * 0.92, 0);
+            ray.rotation.z = a - Math.PI * 0.5;
+            crownHalo.add(ray);
+          }
+          root.add(crownHalo);
+        }
+
+        return {
+          ...cfg,
+          root,
+          squashGroup,
+          hips,
+          torso,
+          head,
+          armL: armLObj.rootPivot,
+          elbowL: armLObj.midPivot,
+          armR: armRObj.rootPivot,
+          elbowR: armRObj.midPivot,
+          legL: legLObj.rootPivot,
+          kneeL: legLObj.midPivot,
+          legR: legRObj.rootPivot,
+          kneeR: legRObj.midPivot,
+          browL,
+          browR,
+          eyeTex,
+          cowboyHat,
+          glassesGlint,
+          auraRing,
+          crownHalo,
+          weapons,
+          hp: 100,
+          isKO: false,
+          isActive: false
+        };
+      }
+
+      const fighters = {};
+      FIGHTER_CONFIGS.forEach((c) => {
+        fighters[c.id] = createArticulatedFighter(c);
+      });
+
+      // ------------------------------------------------------------------------
+      // 11. SIGNATURE ANIME VFX: SLASH ARCS, WATER SPLASHES, HIT SPARKS, SOLAR DRAGON
+      // ------------------------------------------------------------------------
+      const activeShockwaves = [];
+      const shockwaveRingPool = [];
+      for (let i = 0; i < 12; i++) {
+        const ring = new THREE.Mesh(
+          new THREE.RingGeometry(0.6, 1.0, 32),
+          new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        ring.rotation.x = -Math.PI * 0.5;
+        ring.visible = false;
+        scene.add(ring);
+        shockwaveRingPool.push(ring);
+      }
+
+      function spawnShockwave(x, z, maxRadius, colorHex = 0xfef08a, strength = 1.0) {
+        activeShockwaves.push({ x, z, radius: 0.5, maxRadius, colorHex, strength, age: 0, maxAge: 0.65 });
+      }
+
+      // 3D Glowing Weapon / Kick Slash Arc Pool
+      const slashArcPool = [];
+      const slashGeo = new THREE.RingGeometry(1.05, 1.48, 24, 1, 0, Math.PI * 0.85);
+      for (let i = 0; i < 16; i++) {
+        const mesh = new THREE.Mesh(
+          slashGeo,
+          new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        mesh.visible = false;
+        scene.add(mesh);
+        slashArcPool.push({ mesh, life: 0, maxLife: 0.24 });
+      }
+      let slashCursor = 0;
+      function spawnSlashArc(x, y, z, rx, ry, rz, scale, colorHex) {
+        const s = slashArcPool[slashCursor % slashArcPool.length];
+        slashCursor++;
+        s.mesh.position.set(x, getTerrainHeight(x, z) + y, z);
+        s.mesh.rotation.set(rx, ry, rz);
+        s.mesh.scale.setScalar(scale);
+        s.mesh.material.color.setHex(colorHex);
+        s.mesh.material.opacity = 0.92;
+        s.mesh.visible = true;
+        s.life = 0.24;
+      }
+
+      // Directional Impact Hit-Spark & Water Droplet Pool
+      const hitSparkPool = [];
+      const sparkGeo = new THREE.ConeGeometry(0.055, 0.65, 5);
+      sparkGeo.translate(0, 0.32, 0);
+      for (let i = 0; i < 32; i++) {
+        const mesh = new THREE.Mesh(
+          sparkGeo,
+          new THREE.MeshBasicMaterial({
+            color: 0xfef08a,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        mesh.visible = false;
+        scene.add(mesh);
+        hitSparkPool.push({ mesh, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 0.3 });
+      }
+      let sparkCursor = 0;
+      function spawnHitSparks(x, y, z, colorHex, count = 7) {
+        const baseY = getTerrainHeight(x, z) + y;
+        for (let k = 0; k < count; k++) {
+          const sp = hitSparkPool[sparkCursor % hitSparkPool.length];
+          sparkCursor++;
+          const theta = Math.random() * Math.PI * 2;
+          const phi = Math.random() * Math.PI;
+          const spd = 5.5 + Math.random() * 7.5;
+          sp.vx = Math.sin(phi) * Math.cos(theta) * spd;
+          sp.vy = Math.abs(Math.cos(phi)) * spd + 1.8;
+          sp.vz = Math.sin(phi) * Math.sin(theta) * spd;
+          sp.mesh.position.set(x, baseY, z);
+          sp.mesh.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0, 1, 0),
+            new THREE.Vector3(sp.vx, sp.vy, sp.vz).normalize()
+          );
+          sp.mesh.material.color.setHex(colorHex);
+          sp.mesh.material.opacity = 1.0;
+          sp.mesh.visible = true;
+          sp.life = 0.3;
+        }
+      }
+
+      // Afterimage Ghost Clone Pool
+      const ghostPool = [];
+      for (let i = 0; i < 18; i++) {
+        const ghost = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.22, 0.28, 1.55, 8),
+          new THREE.MeshBasicMaterial({
+            color: 0x38bdf8,
+            transparent: true,
+            opacity: 0,
+            blending: THREE.AdditiveBlending
+          })
+        );
+        ghost.visible = false;
+        scene.add(ghost);
+        ghostPool.push({ mesh: ghost, life: 0 });
+      }
+      let ghostCursor = 0;
+      function spawnAfterimage(x, y, z, rotY, colorHex) {
+        const g = ghostPool[ghostCursor % ghostPool.length];
+        ghostCursor++;
+        g.mesh.position.set(x, getTerrainHeight(x, z) + y + 0.85, z);
+        g.mesh.rotation.y = rotY;
+        g.mesh.material.color.setHex(colorHex);
+        g.mesh.material.opacity = 0.52;
+        g.mesh.visible = true;
+        g.life = 0.28;
+      }
+
+      // Damen's Golden Energy Lasso (Act 5)
+      const goldenLasso = new THREE.Mesh(
+        new THREE.TorusGeometry(0.55, 0.045, 8, 28),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending })
+      );
+      goldenLasso.rotation.x = Math.PI * 0.5;
+      goldenLasso.visible = false;
+      scene.add(goldenLasso);
+
+      // Khen's Dark-Violet Crescent Wave & Void Domain Pillar (Act 7)
+      const violetCrescent = new THREE.Mesh(
+        new THREE.TorusGeometry(2.2, 0.24, 8, 28, Math.PI * 1.15),
+        new THREE.MeshBasicMaterial({ color: 0xa855f7, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending })
+      );
+      violetCrescent.visible = false;
+      scene.add(violetCrescent);
+
+      // JM's Golden Charging Aura Sphere (Act 7 buildup)
+      const jmChargeSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(0.85, 18, 14),
+        new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.88, blending: THREE.AdditiveBlending })
+      );
+      jmChargeSphere.visible = false;
+      scene.add(jmChargeSphere);
+
+      // JM's Golden Solar Dragon Beam + Sculpted 3D Dragon Head (Act 7)
+      const solarBeamGroup = new THREE.Group();
+      solarBeamGroup.visible = false;
+      scene.add(solarBeamGroup);
+
+      const beamCore = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.55, 0.72, 18, 16, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.96, blending: THREE.AdditiveBlending })
+      );
+      beamCore.rotation.z = Math.PI * 0.5;
+      beamCore.position.x = -9;
+      solarBeamGroup.add(beamCore);
+
+      const beamOuter = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.15, 1.45, 18, 16, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15, transparent: true, opacity: 0.65, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
+      );
+      beamOuter.rotation.z = Math.PI * 0.5;
+      beamOuter.position.x = -9;
+      solarBeamGroup.add(beamOuter);
+
+      const dragonHead = new THREE.Group();
+      const dragonMat = new THREE.MeshBasicMaterial({ color: 0xfef08a, transparent: true, opacity: 0.92, blending: THREE.AdditiveBlending });
+      const snout = new THREE.Mesh(new THREE.ConeGeometry(0.95, 2.2, 8), dragonMat);
+      snout.rotation.z = Math.PI * 0.5;
+      dragonHead.add(snout);
+      const horn1 = new THREE.Mesh(new THREE.ConeGeometry(0.18, 1.4, 6), dragonMat);
+      horn1.position.set(0.6, 0.7, 0.35);
+      horn1.rotation.z = -0.6;
+      const horn2 = horn1.clone();
+      horn2.position.z = -0.35;
+      dragonHead.add(horn1, horn2);
+      solarBeamGroup.add(dragonHead);
+
+      // Persistent Scorched-Earth Craters & Beam Trail
+      const scorchedCrater = new THREE.Mesh(
+        new THREE.CircleGeometry(2.6, 24),
+        new THREE.MeshBasicMaterial({ color: 0x1c1917, transparent: true, opacity: 0.82 })
+      );
+      scorchedCrater.rotation.x = -Math.PI * 0.5;
+      scorchedCrater.position.set(2.5, 0.05, 1.2);
+      scorchedCrater.visible = false;
+      scene.add(scorchedCrater);
+
+      const beamGroundScar = new THREE.Mesh(
+        new THREE.PlaneGeometry(16.5, 2.1),
+        new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.78, blending: THREE.AdditiveBlending })
+      );
+      beamGroundScar.rotation.x = -Math.PI * 0.5;
+      beamGroundScar.position.set(-1.5, 0.06, 0);
+      beamGroundScar.visible = false;
+      scene.add(beamGroundScar);
+
+      // Celebratory Act 8 Fireworks
+      const fireworks = [];
+      const fwColors = [0xfacc15, 0x38bdf8, 0xf43f5e, 0xa855f7, 0xf59e0b];
+      for (let f = 0; f < 6; f++) {
+        const fwGeo = new THREE.BufferGeometry();
+        const fwPts = new Float32Array(48 * 3);
+        const fwDirs = [];
+        for (let p = 0; p < 48; p++) {
+          const u = Math.random();
+          const v = Math.random();
+          const theta = 2 * Math.PI * u;
+          const phi = Math.acos(2 * v - 1);
+          fwDirs.push(new THREE.Vector3(Math.sin(phi) * Math.cos(theta), Math.cos(phi), Math.sin(phi) * Math.sin(theta)));
+        }
+        fwGeo.setAttribute('position', new THREE.BufferAttribute(fwPts, 3));
+        const fwPoints = new THREE.Points(
+          fwGeo,
+          new THREE.PointsMaterial({ color: fwColors[f % fwColors.length], size: 0.35, transparent: true, opacity: 0, blending: THREE.AdditiveBlending })
+        );
+        scene.add(fwPoints);
+        fireworks.push({
+          points: fwPoints,
+          dirs: fwDirs,
+          origin: new THREE.Vector3(-20 + f * 8, 16 + (f % 2) * 4, -26 - (f % 3) * 5),
+          triggerTime: 110.5 + f * 1.2
+        });
+      }
+
+      // ------------------------------------------------------------------------
+      // 12. HUD SETUP & 120-SECOND TIMELINE / CAMERA CONTROLS
+      // ------------------------------------------------------------------------
+      const fighterHudRow = document.getElementById('fighter-hud-row');
+      FIGHTER_CONFIGS.forEach((cfg) => {
+        const card = document.createElement('div');
+        card.id = `hud-card-${cfg.id}`;
+        card.className = 'glass-panel rounded-xl p-1.5 sm:p-2 border transition-all duration-200 relative overflow-hidden';
+        card.style.borderColor = `${cfg.color}55`;
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-1 mb-1">
+            <span class="font-display font-extrabold text-[11px] sm:text-sm tracking-wide truncate" style="color:${cfg.color}">${cfg.name}</span>
+            <span id="hud-ko-${cfg.id}" class="hidden px-1.5 py-0.2 rounded bg-rose-600 text-white font-display font-extrabold text-[9px] sm:text-[10px] tracking-wider">KO</span>
+          </div>
+          <div class="w-full h-1.5 sm:h-2 bg-slate-950/80 rounded-full overflow-hidden mb-1">
+            <div id="hud-hp-${cfg.id}" class="h-full rounded-full transition-all duration-150" style="width:100%; background:${cfg.color}"></div>
+          </div>
+          <div class="flex items-center justify-between text-[9px] text-slate-300">
+            <span class="truncate hidden sm:inline">${cfg.title}</span>
+            <span id="hud-hp-num-${cfg.id}" class="font-mono font-bold ml-auto">100%</span>
+          </div>
+        `;
+        fighterHudRow.appendChild(card);
+      });
+
+      const ACTS = [
+        { num: 1, start: 0.0,   end: 10.0,  label: 'ACT 1 • CHARACTER INTRODUCTIONS', short: 'Act 1' },
+        { num: 2, start: 10.0,  end: 26.0,  label: 'ACT 2 • THE FIVE-WAY CLASH',      short: 'Act 2' },
+        { num: 3, start: 26.0,  end: 43.0,  label: "ACT 3 • MARJOHN'S SPOTLIGHT",     short: 'Act 3' },
+        { num: 4, start: 43.0,  end: 59.0,  label: "ACT 4 • PRIME'S SPOTLIGHT",       short: 'Act 4' },
+        { num: 5, start: 59.0,  end: 76.0,  label: "ACT 5 • DAMEN'S SPOTLIGHT",       short: 'Act 5' },
+        { num: 6, start: 76.0,  end: 94.0,  label: 'ACT 6 • KHEN VS. JM',             short: 'Act 6' },
+        { num: 7, start: 94.0,  end: 110.0, label: 'ACT 7 • THE FINAL CLASH',         short: 'Act 7' },
+        { num: 8, start: 110.0, end: 120.0, label: 'ACT 8 • CHAMPION JM',             short: 'Act 8' }
+      ];
+
+      function clearCallout() {
+        const box = document.getElementById('impact-callout');
+        box.classList.add('hidden');
+        box.classList.remove('callout-active');
+      }
+
+      const actMarkersContainer = document.getElementById('act-markers');
+      ACTS.forEach((act) => {
+        const pct = (act.start / TOTAL_DURATION) * 100;
+        const btn = document.createElement('button');
+        btn.className = 'absolute top-0 -translate-x-1/2 hover:text-amber-300 transition cursor-pointer whitespace-nowrap';
+        btn.style.left = `${Math.max(3, Math.min(96, pct))}%`;
+        btn.textContent = act.short;
+        btn.title = `${act.label} (${act.start.toFixed(1)}s)`;
+        btn.addEventListener('click', () => {
+          simTime = act.start + 0.02;
+          clearCallout();
+          triggeredMilestones.clear();
+          audioEngine.reset();
+          updateSimulation(0.016, true);
+        });
+        actMarkersContainer.appendChild(btn);
+      });
+
+      let simTime = 0.0;
+      let isPlaying = true;
+      let playbackSpeed = 1.35;
+      let cameraMode = 'auto';
+      const triggeredMilestones = new Set();
+      let mangaFlashTimer = 0;
+      let hitStopTimer = 0;
+
+      const orbitState = {
+        theta: 0.0,
+        phi: 1.18,
+        radius: 17.5,
+        target: new THREE.Vector3(0, 1.3, 0),
+        isDragging: false,
+        prevX: 0,
+        prevY: 0,
+        pinchDist: 0
+      };
+
+      const camPosSpring = new Spring3D(0, 6.5, 19, 165, 22);
+      const camLookSpring = new Spring3D(0, 1.3, 0, 185, 24);
+      const camShakeSpring = new Spring1D(0, 520, 18);
+
+      function triggerMilestone(key, fn) {
+        if (triggeredMilestones.has(key)) return;
+        triggeredMilestones.add(key);
+        fn();
+      }
+
+      function triggerCallout(key, text, borderHex = '#facc15', mangaFlash = false) {
+        if (triggeredMilestones.has(key)) return;
+        triggeredMilestones.add(key);
+        const box = document.getElementById('impact-callout');
+        const txt = document.getElementById('impact-callout-text');
+        txt.textContent = text;
+        txt.style.borderColor = borderHex;
+        txt.style.background = 'rgba(15, 23, 42, 0.88)';
+        txt.style.textShadow = `0 0 26px ${borderHex}`;
+        box.classList.remove('hidden', 'callout-active');
+        void box.offsetWidth;
+        box.classList.add('callout-active');
+        camShakeSpring.impulse(1.65);
+        hitStopTimer = 0.085;
+        if (mangaFlash) {
+          mangaFlashTimer = 0.085;
+        }
+      }
+
+      const btnPlayPause = document.getElementById('btn-play-pause');
+      const playPauseIcon = document.getElementById('play-pause-icon');
+      const playPauseLabel = document.getElementById('play-pause-label');
+      const timelineScrubber = document.getElementById('timeline-scrubber');
+
+      function setPlayingState(playing) {
+        isPlaying = playing;
+        playPauseIcon.textContent = isPlaying ? '❚❚' : '▶';
+        playPauseLabel.textContent = isPlaying ? 'Pause' : 'Play';
+      }
+
+      btnPlayPause.addEventListener('click', () => {
+        if (simTime >= TOTAL_DURATION && !isPlaying) {
+          simTime = 0.0;
+          clearCallout();
+          triggeredMilestones.clear();
+          audioEngine.reset();
+        }
+        setPlayingState(!isPlaying);
+      });
+
+      document.getElementById('btn-replay').addEventListener('click', () => {
+        simTime = 0.0;
+        clearCallout();
+        triggeredMilestones.clear();
+        audioEngine.reset();
+        activeShockwaves.length = 0;
+        setPlayingState(true);
+        updateSimulation(0.016, true);
+      });
+
+      timelineScrubber.addEventListener('input', (e) => {
+        simTime = parseFloat(e.target.value);
+        clearCallout();
+        triggeredMilestones.clear();
+        audioEngine.reset();
+        updateSimulation(0.016, true);
+      });
+
+      document.querySelectorAll('.speed-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          playbackSpeed = parseFloat(btn.dataset.speed);
+          document.querySelectorAll('.speed-btn').forEach((b) => {
+            b.classList.remove('bg-amber-400', 'text-slate-950');
+            b.classList.add('text-slate-300');
+          });
+          btn.classList.add('bg-amber-400', 'text-slate-950');
+          btn.classList.remove('text-slate-300');
+        });
+      });
+
+      document.querySelectorAll('.cam-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          cameraMode = btn.dataset.cam;
+          document.querySelectorAll('.cam-btn').forEach((b) => {
+            b.classList.remove('bg-sky-400', 'text-slate-950');
+            b.classList.add('text-slate-300');
+          });
+          btn.classList.add('bg-sky-400', 'text-slate-950');
+          btn.classList.remove('text-slate-300');
+        });
+      });
+
+      document.getElementById('btn-audio').addEventListener('click', () => {
+        const on = audioEngine.toggle();
+        document.getElementById('audio-icon').textContent = on ? '🔊' : '🔇';
+        document.getElementById('audio-label').textContent = on ? 'Audio On' : 'Audio Off';
+      });
+
+      // Mouse & Touch Controls for Orbit/Zoom on Canvas
+      const domElem = renderer.domElement;
+      domElem.addEventListener('mousedown', (e) => {
+        orbitState.isDragging = true;
+        orbitState.prevX = e.clientX;
+        orbitState.prevY = e.clientY;
+        if (cameraMode === 'auto') {
+          document.querySelector('.cam-btn[data-cam="orbit"]').click();
+        }
+      });
+      window.addEventListener('mousemove', (e) => {
+        if (!orbitState.isDragging) return;
+        const dx = e.clientX - orbitState.prevX;
+        const dy = e.clientY - orbitState.prevY;
+        orbitState.prevX = e.clientX;
+        orbitState.prevY = e.clientY;
+        orbitState.theta -= dx * 0.0075;
+        orbitState.phi = clamp(orbitState.phi - dy * 0.0065, 0.25, 1.48);
+      });
+      window.addEventListener('mouseup', () => {
+        orbitState.isDragging = false;
+      });
+      domElem.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        orbitState.radius = clamp(orbitState.radius + e.deltaY * 0.012, 5.5, 45.0);
+        if (cameraMode === 'auto') {
+          document.querySelector('.cam-btn[data-cam="orbit"]').click();
+        }
+      }, { passive: false });
+
+      domElem.addEventListener('touchstart', (e) => {
+        if (e.touches.length === 1) {
+          orbitState.isDragging = true;
+          orbitState.prevX = e.touches[0].clientX;
+          orbitState.prevY = e.touches[0].clientY;
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          orbitState.pinchDist = Math.hypot(dx, dy);
+        }
+      }, { passive: true });
+      domElem.addEventListener('touchmove', (e) => {
+        if (e.touches.length === 1 && orbitState.isDragging) {
+          const dx = e.touches[0].clientX - orbitState.prevX;
+          const dy = e.touches[0].clientY - orbitState.prevY;
+          orbitState.prevX = e.touches[0].clientX;
+          orbitState.prevY = e.touches[0].clientY;
+          orbitState.theta -= dx * 0.0085;
+          orbitState.phi = clamp(orbitState.phi - dy * 0.0075, 0.25, 1.48);
+          if (cameraMode === 'auto') {
+            document.querySelector('.cam-btn[data-cam="orbit"]').click();
+          }
+        } else if (e.touches.length === 2) {
+          const dx = e.touches[0].clientX - e.touches[1].clientX;
+          const dy = e.touches[0].clientY - e.touches[1].clientY;
+          const dist = Math.hypot(dx, dy);
+          if (orbitState.pinchDist > 0) {
+            orbitState.radius = clamp(orbitState.radius - (dist - orbitState.pinchDist) * 0.04, 5.5, 45.0);
+          }
+          orbitState.pinchDist = dist;
+        }
+      }, { passive: true });
+      domElem.addEventListener('touchend', () => {
+        orbitState.isDragging = false;
+        orbitState.pinchDist = 0;
+      });
+
+      // ------------------------------------------------------------------------
+      // 13. NODE.JS ZERO-DEPENDENCY SERVER MODAL
+      // ------------------------------------------------------------------------
+      const nodeServerSource = `#!/usr/bin/env node
+/**
+ * SQUAD CLASH 3D — Golden Meadow Edition (120s Director's Cut)
+ * Zero-Dependency Node.js Static HTTP Server
+ * Usage: node squad-clash-server.js [port]
+ */
+const http = require('http');
+const fs = require('fs');
+const path = require('path');
+
+const PORT = parseInt(process.argv[2] || process.env.PORT || '3000', 10);
+const PUBLIC_DIR = __dirname;
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js':   'application/javascript; charset=utf-8',
+  '.css':  'text/css; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.svg':  'image/svg+xml',
+  '.png':  'image/png',
+  '.ico':  'image/x-icon'
+};
+
+const server = http.createServer((req, res) => {
+  const safePath = decodeURIComponent((req.url || '/').split('?')[0]);
+  const relPath = safePath === '/' ? 'index.html' : safePath.replace(/^\\/+/, '');
+  const filePath = path.join(PUBLIC_DIR, relPath);
+
+  if (!filePath.startsWith(PUBLIC_DIR)) {
+    res.writeHead(403, { 'Content-Type': 'text/plain' });
+    return res.end('403 Forbidden');
+  }
+
+  fs.readFile(filePath, (err, content) => {
+    if (err) {
+      res.writeHead(err.code === 'ENOENT' ? 404 : 500, { 'Content-Type': 'text/plain' });
+      return res.end(err.code === 'ENOENT' ? '404 Not Found' : '500 Internal Server Error');
+    }
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, {
+      'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+      'Cache-Control': 'no-cache'
+    });
+    res.end(content);
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(\`\\n🌾 SQUAD CLASH 3D — Golden Meadow Edition running at http://localhost:\${PORT}\\n\`);
+});
+`;
+
+      const nodeModal = document.getElementById('node-modal');
+      document.getElementById('node-code-block').textContent = nodeServerSource;
+
+      function showToast(msg) {
+        const toast = document.getElementById('toast-box');
+        toast.textContent = msg;
+        toast.style.opacity = '1';
+        setTimeout(() => {
+          toast.style.opacity = '0';
+        }, 2100);
+      }
+
+      document.getElementById('btn-node-modal').addEventListener('click', () => {
+        nodeModal.classList.remove('hidden');
+        nodeModal.classList.add('flex');
+      });
+      document.getElementById('btn-close-modal').addEventListener('click', () => {
+        nodeModal.classList.add('hidden');
+        nodeModal.classList.remove('flex');
+      });
+      nodeModal.addEventListener('click', (e) => {
+        if (e.target === nodeModal) {
+          nodeModal.classList.add('hidden');
+          nodeModal.classList.remove('flex');
+        }
+      });
+
+      document.getElementById('btn-copy-node').addEventListener('click', () => {
+        const tempArea = document.createElement('textarea');
+        tempArea.value = nodeServerSource;
+        document.body.appendChild(tempArea);
+        tempArea.select();
+        try {
+          document.execCommand('copy');
+          showToast('Node.js server code copied to clipboard!');
+        } catch (err) {
+          showToast('Copy failed — please select text manually.');
+        }
+        document.body.removeChild(tempArea);
+      });
+
+      document.getElementById('btn-download-node').addEventListener('click', () => {
+        const blob = new Blob([nodeServerSource], { type: 'application/javascript' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'squad-clash-server.js';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast('Downloaded squad-clash-server.js!');
+      });
+
+      // ------------------------------------------------------------------------
+      // 14. MULTI-JOINT ARTICULATED POSING & 120-SECOND 8-ACT CHOREOGRAPHY
+      // ------------------------------------------------------------------------
+      function poseFighter(f, opts) {
+        const {
+          x = f.startX,
+          y = 0,
+          z = 0,
+          rotY = 0,
+          leanX = 0,
+          leanZ = 0,
+          hipY = 0,
+          torsoPitch = 0,
+          torsoYaw = 0,
+          torsoRoll = 0,
+          headYaw = 0,
+          headPitch = 0,
+          armLAngle = [-0.45, 0, -0.22],
+          elbowL = -0.85,
+          armRAngle = [-0.45, 0, 0.22],
+          elbowR = -0.85,
+          legLAngle = [-0.15, 0, -0.08],
+          kneeL = 0.25,
+          legRAngle = [0.15, 0, 0.08],
+          kneeR = 0.25,
+          eyeState = 'normal',
+          auraOpacity = 0,
+          squash = 1.0,
+          active = false
+        } = opts;
+
+        const groundY = getTerrainHeight(x, z);
+        f.root.position.set(x, groundY + y, z);
+        f.root.rotation.set(leanX, rotY, leanZ);
+
+        const sy = squash;
+        const sxz = 1 / Math.sqrt(Math.max(0.45, sy));
+        f.squashGroup.scale.set(sxz, sy, sxz);
+
+        f.hips.position.y = 0.92 + hipY;
+        f.torso.rotation.set(torsoPitch, torsoYaw, torsoRoll);
+        f.head.rotation.set(headPitch - torsoPitch * 0.65, headYaw - torsoYaw * 0.75, -torsoRoll * 0.5);
+
+        f.armL.rotation.set(armLAngle[0], armLAngle[1], armLAngle[2]);
+        f.elbowL.rotation.x = elbowL;
+        f.armR.rotation.set(armRAngle[0], armRAngle[1], armRAngle[2]);
+        f.elbowR.rotation.x = elbowR;
+
+        f.legL.rotation.set(legLAngle[0], legLAngle[1], legLAngle[2]);
+        f.kneeL.rotation.x = kneeL;
+        f.legR.rotation.set(legRAngle[0], legRAngle[1], legRAngle[2]);
+        f.kneeR.rotation.x = kneeR;
+
+        if (f.eyeTex.userData.drawState(eyeState)) {
+          f.eyeTex.needsUpdate = true;
+        }
+
+        f.auraRing.material.opacity = auraOpacity;
+        f.auraRing.scale.setScalar(1.0 + Math.sin(simTime * 10) * 0.12);
+        f.isActive = active;
+
+        if (f._sashRibbons) {
+          const flutter = Math.sin(simTime * 10 + x) * 0.24;
+          f._sashRibbons[0].rotation.x = 0.28 + flutter + Math.max(0, y * 0.12);
+          f._sashRibbons[1].rotation.x = 0.28 - flutter + Math.max(0, y * 0.12);
+        }
+        if (f._coatTail) {
+          f._coatTail.rotation.x = 0.24 + Math.sin(simTime * 9 + z) * 0.18;
+        }
+        if (f._idBadge) {
+          f._idBadge.rotation.x = -leanX * 0.8 + Math.sin(simTime * 7) * 0.08;
+        }
+      }
+
+      function getKOPose(x, z, rotY) {
+        return {
+          x,
+          y: 0.16,
+          z,
+          rotY,
+          leanX: -1.46,
+          hipY: -0.05,
+          torsoPitch: -0.15,
+          armLAngle: [-0.3, 0, -0.65],
+          elbowL: -0.45,
+          armRAngle: [-0.2, 0, 0.72],
+          elbowR: -0.5,
+          legLAngle: [-0.15, 0, -0.18],
+          kneeL: 0.35,
+          legRAngle: [0.1, 0, 0.22],
+          kneeR: 0.45,
+          eyeState: 'ko',
+          auraOpacity: 0,
+          active: false
+        };
+      }
+
+      function updateEnvironmentalDestruction(t) {
+        // 1) Western Ruined Temple Archway & Pillars shatter at t = 40.5s
+        const templeBreakT = t - 40.5;
+        templeBlocks.forEach((b) => {
+          if (!b.isDestructible || templeBreakT <= 0) {
+            b.mesh.position.copy(b.origin);
+            b.mesh.rotation.set(0, 0, 0);
+          } else {
+            const dtB = Math.min(templeBreakT, 3.5);
+            const nx = b.origin.x + b.vx * dtB;
+            const nz = b.origin.z + b.vz * dtB;
+            const ground = getTerrainHeight(nx, nz) + b.halfH;
+            const rawY = b.origin.y + b.vy * dtB - 0.5 * 14.5 * dtB * dtB;
+            const ny = Math.max(ground, rawY);
+            const settled = rawY <= ground;
+            b.mesh.position.set(nx, ny, nz);
+            const spinT = settled ? Math.min(dtB, 1.1) : dtB;
+            b.mesh.rotation.set(b.rx * spinT, 0.4 * spinT, b.rz * spinT);
+          }
+        });
+
+        // 2) Eastern Highland Cliff Slabs avalanche at t = 56.5s
+        const cliffBreakT = t - 56.5;
+        cliffSlabs.forEach((s) => {
+          if (cliffBreakT <= 0) {
+            s.mesh.position.copy(s.origin);
+            s.mesh.rotation.set(0, 0, 0);
+          } else {
+            const dtC = Math.min(cliffBreakT, 3.8);
+            const nx = s.origin.x + s.vx * dtC;
+            const nz = s.origin.z + s.vz * dtC;
+            const ground = getTerrainHeight(nx, nz) + s.rad * 0.65;
+            const rawY = s.origin.y + s.vy * dtC - 0.5 * 14.0 * dtC * dtC;
+            const ny = Math.max(ground, rawY);
+            const settled = rawY <= ground;
+            s.mesh.position.set(nx, ny, nz);
+            const spinT = settled ? Math.min(dtC, 1.2) : dtC;
+            s.mesh.rotation.set(s.rx * spinT, 0.3 * spinT, s.rz * spinT);
+          }
+        });
+
+        // 3) Shattering Field Boulder (Prime shatters at t = 46.2s)
+        if (t < primeShatterBoulder.shatterTime) {
+          primeShatterBoulder.mesh.visible = true;
+          primeShatterBoulder.shards.forEach((sh) => (sh.mesh.visible = false));
+        } else {
+          primeShatterBoulder.mesh.visible = false;
+          const dtS = Math.min(t - primeShatterBoulder.shatterTime, 3.0);
+          primeShatterBoulder.shards.forEach((sh) => {
+            sh.mesh.visible = true;
+            const nx = primeShatterBoulder.origin.x + sh.vx * dtS;
+            const nz = primeShatterBoulder.origin.z + sh.vz * dtS;
+            const ground = getTerrainHeight(nx, nz) + 0.18;
+            const sy = Math.max(ground, primeShatterBoulder.origin.y + sh.vy * dtS - 0.5 * 14.0 * dtS * dtS);
+            sh.mesh.position.set(nx, sy, nz);
+            sh.mesh.rotation.set(sh.rx * dtS, 0, sh.rz * dtS);
+          });
+        }
+
+        // 4) Rolling Boulder pushed across field in Act 4 (49.5s – 52.0s)
+        const rollP = smoothstep(49.5, 52.0, t);
+        const rx = lerp(rollingBoulder.origin.x, -4.5, rollP);
+        const rz = lerp(rollingBoulder.origin.z, -1.5, rollP);
+        rollingBoulder.mesh.position.set(rx, getTerrainHeight(rx, rz) + rollingBoulder.radius * 0.55, rz);
+        rollingBoulder.mesh.rotation.z = rollP * Math.PI * 3.5;
+
+        // 5) Persistent Ground Craters & Solar Dragon Canyon Scar
+        scorchedCrater.visible = t >= 47.5;
+        beamGroundScar.visible = t >= 106.2;
+      }
+
+      function updateSimulation(dt, isScrub = false) {
+        const t = simTime;
+
+        const currentAct = ACTS.find((a) => t >= a.start && t <= a.end) || ACTS[ACTS.length - 1];
+        document.getElementById('act-badge-text').textContent = currentAct.label;
+        document.getElementById('time-display').textContent = `${t.toFixed(1).padStart(5, '0')}s`;
+        timelineScrubber.value = t.toFixed(2);
+
+        // Reset transient VFX visibility per frame
+        goldenLasso.visible = false;
+        violetCrescent.visible = false;
+        jmChargeSphere.visible = false;
+        solarBeamGroup.visible = false;
+        actionPointLight.intensity = 0;
+        document.getElementById('champion-banner').classList.add('hidden');
+        if (fighters.khen.glassesGlint) fighters.khen.glassesGlint.visible = false;
+        if (fighters.jm.crownHalo) fighters.jm.crownHalo.visible = false;
+
+        // Atmosphere Sky Storm Factor (Acts 6–7 twilight storm, Act 8 golden sunrise burst)
+        let stormFactor = 0.0;
+        if (t >= 76.0 && t < 78.2) {
+          stormFactor = smoothstep(76.0, 78.2, t);
+        } else if (t >= 78.2 && t < 110.0) {
+          stormFactor = 1.0;
+        } else if (t >= 110.0 && t < 112.2) {
+          stormFactor = 1.0 - smoothstep(110.0, 112.2, t);
+        }
+        skyUniforms.uStormFactor.value = stormFactor;
+        skyUniforms.uTime.value = t;
+
+        const goldenFog = new THREE.Color('#fde68a');
+        const stormFog = new THREE.Color('#3b0764');
+        fog.color.copy(goldenFog).lerp(stormFog, stormFactor * 0.78);
+        sunLight.intensity = lerp(1.85, 0.72, stormFactor) + (t >= 110.0 ? 0.45 : 0);
+        godRayMeshes.forEach((ray) => {
+          ray.material.opacity = lerp(0.068, 0.008, stormFactor) + (t >= 110.0 ? 0.045 : 0);
+        });
+        cloudMaterials.forEach((cm) => {
+          cm.color.setHex(0xfff7ed).lerp(new THREE.Color(0x311042), stormFactor * 0.85);
+          cm.emissive.setHex(0xfbbf24).lerp(new THREE.Color(0x7e22ce), stormFactor);
+        });
+
+        // Deterministic Fighter HP & KO States across 120s
+        FIGHTER_CONFIGS.forEach((cfg) => {
+          const f = fighters[cfg.id];
+          f.isKO = cfg.koTime !== null && t >= cfg.koTime;
+          if (cfg.id === 'marjohn') f.hp = t < 38.0 ? 100 : t < 42.2 ? lerp(100, 0, (t - 38.0) / 4.2) : 0;
+          if (cfg.id === 'prime')   f.hp = t < 54.0 ? 100 : t < 58.2 ? lerp(100, 0, (t - 54.0) / 4.2) : 0;
+          if (cfg.id === 'damen')   f.hp = t < 71.0 ? 100 : t < 75.0 ? lerp(100, 0, (t - 71.0) / 4.0) : 0;
+          if (cfg.id === 'khen')    f.hp = t < 104.5 ? 100 : t < 109.0 ? lerp(100, 0, (t - 104.5) / 4.5) : 0;
+          if (cfg.id === 'jm')      f.hp = t < 88.0 ? 100 : t < 103.0 ? lerp(100, 68, (t - 88.0) / 15.0) : 74;
+        });
+
+        // Update 3D Environmental Destruction
+        updateEnvironmentalDestruction(t);
+
+        // Damen's Cowboy Hat (detaches at t = 72.8s in Act 5 and lands on boulder)
+        if (fighters.damen.cowboyHat) {
+          if (t < 72.8) {
+            if (fighters.damen.cowboyHat.parent !== fighters.damen.head) {
+              fighters.damen.head.add(fighters.damen.cowboyHat);
+            }
+            fighters.damen.cowboyHat.position.set(0, 0.22, 0);
+            fighters.damen.cowboyHat.rotation.set(Math.sin(t * 4) * 0.05, 0, Math.cos(t * 3) * 0.04);
+          } else {
+            if (fighters.damen.cowboyHat.parent !== scene) {
+              scene.add(fighters.damen.cowboyHat);
+            }
+            const ht = clamp((t - 72.8) / 1.8, 0, 1);
+            const arcY = Math.sin(ht * Math.PI) * 5.6;
+            const bx = hatLandingBoulder.origin.x;
+            const by = hatLandingBoulder.origin.y + hatLandingBoulder.radius * 0.78;
+            const bz = hatLandingBoulder.origin.z;
+            fighters.damen.cowboyHat.position.set(
+              lerp(2.0, bx, ht),
+              lerp(3.2, by, ht) + arcY,
+              lerp(-4.0, bz, ht)
+            );
+            fighters.damen.cowboyHat.rotation.set(ht * Math.PI * 4, ht * Math.PI * 6, 0.14 * ht);
+          }
+        }
+
+        let camDest = new THREE.Vector3(0, 4.2, 16.5);
+        let lookDest = new THREE.Vector3(0, 1.3, 0);
+
+        // ======================================================================
+        // ACT 1 (0.0s – 10.0s): INDIVIDUAL CHARACTER INTRODUCTIONS
+        // ======================================================================
+        if (t < 10.0) {
+          // 0.0–2.0s: MARJOHN glides down on swirling Azure Wind currents onto Western Temple plaza
+          const mIn = smoothstep(0.0, 1.4, t);
+          const mX = lerp(-18.0, -7.5, mIn);
+          const mY = lerp(9.5, 0, mIn);
+          const mZ = lerp(-8.0, -2.5, mIn);
+          if (t >= 1.38 && t <= 1.48 && !isScrub) {
+            triggerMilestone('intro-marjohn', () => {
+              spawnShockwave(-7.5, -2.5, 4.2, 0x38bdf8, 0.8);
+              audioEngine.playEvent('intro-m-sfx', 'wind');
+            });
+          }
+          poseFighter(fighters.marjohn, {
+            ...getMartialGuardPose(t, 0, 'staff'),
+            x: mX,
+            y: mY,
+            z: mZ,
+            rotY: 1.25,
+            leanX: mIn < 1 ? 0.35 : 0,
+            eyeState: 'fierce',
+            auraOpacity: t < 2.3 ? 0.85 : 0.25,
+            active: t < 2.0
+          });
+          if (fighters.marjohn.weapons.staff) fighters.marjohn.weapons.staff.rotation.y = t * 14;
+
+          // 2.0–4.0s: PRIME drops like a meteor with Crimson Blaze gauntlet slam
+          const pIn = smoothstep(2.0, 3.1, t);
+          const pY = t < 2.0 ? 22 : lerp(18.0, 0, pIn * pIn);
+          const pCompress = t >= 3.1 && t < 3.6 ? Math.sin(((t - 3.1) / 0.5) * Math.PI) : 0;
+          if (t >= 3.08 && t <= 3.18 && !isScrub) {
+            triggerMilestone('intro-prime', () => {
+              spawnShockwave(-3.5, 2.2, 6.5, 0xf43f5e, 1.2);
+              spawnHitSparks(-3.5, 0.3, 2.2, 0xf43f5e, 10);
+              camShakeSpring.impulse(1.2);
+              audioEngine.playEvent('intro-p-sfx', 'clash');
+            });
+          }
+          poseFighter(fighters.prime, {
+            ...getMartialGuardPose(t, 0.7, 'heavy'),
+            x: -3.5,
+            y: pY,
+            z: 2.2,
+            rotY: 0.45,
+            hipY: -0.14 - pCompress * 0.28,
+            kneeL: 0.72 + pCompress * 0.65,
+            kneeR: 0.65 + pCompress * 0.65,
+            squash: 1.0 - pCompress * 0.24,
+            eyeState: 'fierce',
+            auraOpacity: t >= 2.0 && t < 4.3 ? 0.9 : 0.25,
+            active: t >= 2.0 && t < 4.0
+          });
+
+          // 4.0–6.0s: DAMEN vaults playfully over the southern wooden pasture fence & tips cowboy hat
+          const dIn = smoothstep(4.0, 5.4, t);
+          const dZ = t < 4.0 ? 18.0 : lerp(16.2, 5.5, dIn);
+          const dVaultY = t >= 4.2 && t <= 5.0 ? Math.sin(((t - 4.2) / 0.8) * Math.PI) * 2.1 : 0;
+          if (t >= 4.4 && t <= 4.5 && !isScrub) {
+            triggerMilestone('intro-damen', () => {
+              audioEngine.playEvent('intro-d-sfx', 'whoosh');
+            });
+          }
+          const isHatTip = t >= 5.3 && t <= 6.2;
+          poseFighter(fighters.damen, {
+            ...getMartialGuardPose(t, 1.4, 'guns'),
+            x: 0.5,
+            y: dVaultY,
+            z: dZ,
+            rotY: Math.PI,
+            leanX: dVaultY > 0 ? dVaultY * 0.35 : 0,
+            armLAngle: isHatTip ? [-2.35, 0.35, -0.2] : [-0.95, 0.15, -0.32],
+            elbowL: isHatTip ? -1.45 : -1.15,
+            armRAngle: isHatTip ? [-1.35, -0.2, 0.25] : [-0.95, -0.15, 0.32],
+            elbowR: isHatTip ? -0.25 : -1.15,
+            eyeState: 'normal',
+            auraOpacity: t >= 4.0 && t < 6.3 ? 0.75 : 0.2,
+            active: t >= 4.0 && t < 6.0
+          });
+
+          // 6.0–8.0s: KHEN flash-steps silently onto northern stream boulder with sharp white glasses glint
+          const kVis = t >= 6.15;
+          if (t >= 6.15 && t <= 6.25 && !isScrub) {
+            triggerMilestone('intro-khen', () => {
+              spawnAfterimage(khenIntroRock.origin.x, 1.2, khenIntroRock.origin.z, 0, 0xa855f7);
+              spawnShockwave(khenIntroRock.origin.x, khenIntroRock.origin.z, 4.0, 0xa855f7, 0.8);
+              audioEngine.playEvent('intro-k-sfx', 'whoosh');
+            });
+          }
+          if (fighters.khen.glassesGlint && t >= 6.75 && t <= 7.65) {
+            fighters.khen.glassesGlint.visible = true;
+            const gs = Math.sin(((t - 6.75) / 0.9) * Math.PI) * 1.45;
+            fighters.khen.glassesGlint.scale.setScalar(Math.max(0.01, gs));
+          }
+          poseFighter(fighters.khen, {
+            ...getMartialGuardPose(t, 2.1, 'daggers'),
+            x: khenIntroRock.origin.x,
+            y: kVis ? 0.95 : 24,
+            z: khenIntroRock.origin.z,
+            rotY: -0.35,
+            armRAngle: t >= 6.6 && t <= 7.7 ? [-2.15, 0.32, 0.1] : [-0.65, -0.32, 0.35],
+            elbowR: t >= 6.6 && t <= 7.7 ? -1.65 : -1.42,
+            eyeState: 'fierce',
+            auraOpacity: t >= 6.0 && t < 8.3 ? 0.85 : 0.25,
+            active: t >= 6.0 && t < 8.0
+          });
+
+          // 8.0–10.0s: JM walks calmly into sunlit central clearing, golden aura rising
+          const jWalk = smoothstep(8.0, 9.4, t);
+          const strideJM = getRunStridePose(t * 10, (1 - jWalk) * 0.75);
+          if (t >= 9.35 && t <= 9.45 && !isScrub) {
+            triggerMilestone('intro-jm', () => {
+              spawnShockwave(4.5, 0.5, 11.0, 0xfacc15, 1.0);
+              audioEngine.playEvent('intro-j-sfx', 'beam');
+            });
+          }
+          poseFighter(fighters.jm, {
+            ...strideJM,
+            x: lerp(11.5, 4.5, jWalk),
+            y: 0,
+            z: lerp(3.5, 0.5, jWalk),
+            rotY: -1.35,
+            hipY: jWalk >= 0.98 ? -0.06 : strideJM.hipY,
+            torsoPitch: jWalk >= 0.98 ? 0.08 : strideJM.torsoPitch,
+            armLAngle: jWalk >= 0.98 ? [-0.45, 0.2, -0.25] : strideJM.armL,
+            elbowL: jWalk >= 0.98 ? -1.1 : strideJM.elbowL,
+            armRAngle: jWalk >= 0.98 ? [-0.45, -0.2, 0.25] : strideJM.armR,
+            elbowR: jWalk >= 0.98 ? -1.1 : strideJM.elbowR,
+            eyeState: t >= 9.2 ? 'fierce' : 'normal',
+            auraOpacity: t >= 8.2 ? 0.85 : 0.2,
+            active: t >= 8.0
+          });
+
+          // Camera Director switches cleanly between each fighter's introduction!
+          if (t < 2.0) {
+            camDest.set(-4.5, 2.5, 2.5);
+            lookDest.set(mX, mY + 1.2, mZ);
+          } else if (t < 4.0) {
+            camDest.set(-1.2, 2.4, 7.8);
+            lookDest.set(-3.5, 1.15, 2.2);
+          } else if (t < 6.0) {
+            camDest.set(2.8, 2.2, 10.5);
+            lookDest.set(0.5, dVaultY + 1.15, dZ);
+          } else if (t < 8.0) {
+            camDest.set(3.2, 3.1, -9.2);
+            lookDest.set(khenIntroRock.origin.x, 2.35, khenIntroRock.origin.z);
+          } else {
+            camDest.set(1.5, 2.3, 6.2);
+            lookDest.set(lerp(11.5, 4.5, jWalk), 1.25, lerp(3.5, 0.5, jWalk));
+          }
+        }
+
+        // ======================================================================
+        // ACT 2 (10.0s – 26.0s): THE FIVE-WAY CLASH (MULTI-ZONE SKIRMISHES)
+        // ======================================================================
+        else if (t < 26.0) {
+          const localT = t - 10.0;
+
+          if (localT < 13.2) {
+            // Readable 3-beat battle choreography across the meadow clearing & stream bank
+            const phaseCycle = localT * 1.45;
+            const focusBeat = Math.floor(localT / 4.4); // 0: Marjohn/Prime/Damen, 1: Khen/JM/Marjohn, 2: All 5 convergence
+
+            if (focusBeat === 0) {
+              camDest.set(-2.2, 3.2, 11.2);
+              lookDest.set(-2.0, 1.3, 1.0);
+            } else if (focusBeat === 1) {
+              camDest.set(2.8, 3.4, 10.8);
+              lookDest.set(2.5, 1.3, -1.5);
+            } else {
+              camDest.set(Math.sin(localT * 0.7) * 7.5, 4.2, 13.5);
+              lookDest.set(0, 1.4, 0);
+            }
+
+            // Marjohn sweeping Azure Wind arcs & leaping over Prime's heavy rushes
+            const mAng = localT * 1.35;
+            const mX = -3.8 + Math.cos(mAng) * 2.8;
+            const mZ = -1.2 + Math.sin(mAng) * 2.6;
+            const mJump = Math.max(0, Math.sin(mAng * 2.2)) * 1.45;
+            if (Math.floor(phaseCycle * 1.6) !== Math.floor((phaseCycle - 0.05) * 1.6) && !isScrub) {
+              spawnSlashArc(mX, mJump + 1.2, mZ, 0.25, mAng, 0.2, 1.35, 0x38bdf8);
+            }
+            poseFighter(fighters.marjohn, {
+              x: mX,
+              y: mJump,
+              z: mZ,
+              rotY: mAng + 1.5,
+              leanX: 0.25,
+              torsoYaw: Math.sin(phaseCycle * 3) * 0.65,
+              armLAngle: [-1.1, 0.4, -0.2],
+              elbowL: -0.8,
+              armRAngle: [-1.35, -0.3, 0.3],
+              elbowR: -0.45,
+              thighL: [-0.45, 0, -0.15],
+              kneeL: 0.65,
+              thighR: [0.35, 0, 0.15],
+              kneeR: 0.55,
+              eyeState: 'fierce',
+              auraOpacity: 0.65,
+              active: focusBeat === 0
+            });
+            if (fighters.marjohn.weapons.staff) fighters.marjohn.weapons.staff.rotation.y = t * 18;
+
+            // Prime Crimson Blaze heavy haymakers & ground slams
+            const pX = -1.8 + Math.sin(mAng * 0.9) * 2.4;
+            const pZ = 1.6 + Math.cos(mAng * 0.9) * 2.2;
+            const punch = Math.sin(phaseCycle * 2.8);
+            if (punch > 0.94 && !isScrub) {
+              spawnHitSparks(pX, 1.25, pZ, 0xf43f5e, 6);
+              audioEngine.playEvent(`act2-p-${Math.floor(phaseCycle * 2.8)}`, 'whoosh');
+            }
+            poseFighter(fighters.prime, {
+              x: pX,
+              y: 0,
+              z: pZ,
+              rotY: Math.atan2(mX - pX, mZ - pZ),
+              hipY: -0.14,
+              torsoPitch: 0.26,
+              torsoYaw: punch * 0.6,
+              armLAngle: punch > 0 ? [-1.52, 0.15, -0.1] : [-0.85, 0.2, -0.3],
+              elbowL: punch > 0 ? -0.15 : -1.45,
+              armRAngle: punch <= 0 ? [-1.52, -0.15, 0.1] : [-0.85, -0.2, 0.3],
+              elbowR: punch <= 0 ? -0.15 : -1.45,
+              thighL: [-0.45, 0, -0.15],
+              kneeL: 0.68,
+              thighR: [0.35, 0, 0.15],
+              kneeR: 0.58,
+              eyeState: 'fierce',
+              auraOpacity: 0.72,
+              active: focusBeat === 0
+            });
+
+            // Damen agile low gun-kata slides & aerial flips
+            const dX = Math.sin(localT * 1.1) * 4.6;
+            const dZ = 3.2 + Math.cos(localT * 1.3) * 1.8;
+            const isSlide = (localT % 2.4) < 0.9;
+            if (Math.floor(t * 3.5) !== Math.floor((t - 0.02) * 3.5) && !isScrub) {
+              audioEngine.playEvent(`act2-gun-${Math.floor(t * 3.5)}`, 'gunshot');
+              spawnHitSparks(dX, isSlide ? 0.75 : 1.25, dZ - 0.4, 0xfacc15, 4);
+            }
+            poseFighter(fighters.damen, {
+              x: dX,
+              y: isSlide ? 0 : Math.abs(Math.sin(localT * 3.2)) * 1.2,
+              z: dZ,
+              rotY: Math.atan2(-dX, -dZ),
+              hipY: isSlide ? -0.36 : 0,
+              torsoPitch: isSlide ? -0.28 : 0.14,
+              armLAngle: [-1.45, -0.35, -0.2],
+              elbowL: -0.25,
+              armRAngle: [-1.45, 0.35, 0.2],
+              elbowR: -0.25,
+              thighL: isSlide ? [-1.25, 0, -0.1] : [-0.45, 0, -0.15],
+              kneeL: isSlide ? 0.15 : 0.75,
+              thighR: isSlide ? [0.75, 0, 0.25] : [0.35, 0, 0.15],
+              kneeR: isSlide ? 1.55 : 0.65,
+              eyeState: 'fierce',
+              auraOpacity: 0.52,
+              active: focusBeat === 0
+            });
+
+            // Khen & JM high-speed martial arts exchange on the right meadow
+            const kX = 2.6 + Math.sin(localT * 1.1) * 1.6;
+            const jX = kX + 1.45;
+            const kjZ = -1.8 + Math.cos(localT * 1.0) * 1.8;
+            const beat = (localT * 1.6) % 2.0;
+            if (beat < 1.0) {
+              const atk = Math.sin(beat * Math.PI);
+              if (atk > 0.94 && !isScrub) {
+                spawnSlashArc(kX + 0.65, 1.2, kjZ, 0.3, 1.57, 0.6, 1.05, 0xa855f7);
+                spawnHitSparks(kX + 0.7, 1.2, kjZ, 0xfef08a, 5);
+              }
+              poseFighter(fighters.khen, {
+                x: kX + atk * 0.45,
+                y: 0,
+                z: kjZ,
+                rotY: 1.57,
+                hipY: -0.12,
+                torsoPitch: 0.34,
+                torsoYaw: atk * 0.5,
+                armLAngle: [-1.45, 0.35, -0.2],
+                elbowL: -0.3,
+                armRAngle: [-1.45, -0.35, 0.2],
+                elbowR: -0.3,
+                thighL: [-0.65, 0, -0.1],
+                kneeL: 0.75,
+                thighR: [0.55, 0, 0.1],
+                kneeR: 0.35,
+                eyeState: 'fierce',
+                auraOpacity: 0.68,
+                active: focusBeat === 1
+              });
+              poseFighter(fighters.jm, {
+                ...getMartialGuardPose(t, 0.4),
+                x: jX + atk * 0.25,
+                z: kjZ,
+                rotY: -1.57,
+                eyeState: 'fierce',
+                auraOpacity: 0.68,
+                active: focusBeat === 1
+              });
+            } else {
+              const kick = Math.sin((beat - 1.0) * Math.PI);
+              if (kick > 0.94 && !isScrub) {
+                spawnSlashArc(jX - 0.65, 1.35, kjZ, Math.PI * 0.45, 0, 0, 1.15, 0xfacc15);
+                spawnHitSparks(jX - 0.75, 1.35, kjZ, 0xfacc15, 6);
+              }
+              poseFighter(fighters.jm, {
+                x: jX - kick * 0.4,
+                y: kick * 0.28,
+                z: kjZ,
+                rotY: -1.57 - kick * 0.9,
+                leanZ: -kick * 0.42,
+                torsoYaw: kick * 0.65,
+                armLAngle: [-0.7, 0.3, -0.4],
+                elbowL: -1.2,
+                armRAngle: [-0.5, -0.3, 0.5],
+                elbowR: -1.1,
+                thighL: [0.15, 0, -0.1],
+                kneeL: 0.25,
+                thighR: [-1.65 * kick, 0, 0.35 * kick],
+                kneeR: 0.15,
+                eyeState: 'fierce',
+                auraOpacity: 0.75,
+                active: focusBeat === 1
+              });
+              poseFighter(fighters.khen, {
+                ...getMartialGuardPose(t, 1.2, 'daggers'),
+                x: kX - kick * 0.35,
+                z: kjZ,
+                rotY: 1.57,
+                eyeState: 'fierce',
+                auraOpacity: 0.6,
+                active: focusBeat === 1
+              });
+            }
+          } else {
+            // 23.2s – 26.0s: 5-Way Mid-Air Convergence CLASH!
+            const clashIn = clamp((t - 23.2) / 0.85, 0, 1);
+            const bounceOut = t >= 24.4 ? smoothstep(24.4, 26.0, t) : 0;
+            const rad = lerp(5.4, 0.9, clashIn) + bounceOut * 5.2;
+            const midY = lerp(0.5, 4.2, clashIn) * (1.0 - bounceOut * 0.85);
+
+            if (t >= 24.0 && t <= 24.15 && !isScrub) {
+              triggerCallout('act2-clash', 'CLASH!', '#facc15', true);
+              triggerMilestone('act2-clash-vfx', () => {
+                spawnShockwave(0, 0, 19.0, 0xffffff, 1.5);
+                spawnHitSparks(0, midY + 0.8, 0, 0xfef08a, 14);
+                audioEngine.playEvent('act2-clash-sfx', 'clash');
+              });
+            }
+            actionPointLight.color.setHex(0xfef08a);
+            actionPointLight.position.set(0, midY, 0);
+            actionPointLight.intensity = t >= 23.95 && t <= 24.55 ? 5.5 : 1.5;
+
+            camDest.set(0, 4.6, 11.8 + bounceOut * 3.8);
+            lookDest.set(0, midY, 0);
+
+            FIGHTER_CONFIGS.forEach((cfg, idx) => {
+              const a = (idx / 5) * Math.PI * 2 - Math.PI * 0.5;
+              const fx = Math.cos(a) * rad;
+              const fz = Math.sin(a) * rad;
+              const isKick = idx % 2 === 1;
+              poseFighter(fighters[cfg.id], {
+                x: fx,
+                y: midY,
+                z: fz,
+                rotY: Math.atan2(-fx, -fz),
+                leanX: bounceOut > 0 ? -0.52 : 0.45,
+                torsoYaw: 0.35,
+                eyeState: bounceOut > 0 ? 'shock' : 'fierce',
+                auraOpacity: 0.9,
+                active: true,
+                armLAngle: [-0.8, 0.3, -0.4],
+                elbowL: -1.1,
+                armRAngle: [-1.62, 0, 0.1],
+                elbowR: -0.15,
+                thighL: [0.35, 0, -0.15],
+                kneeL: 0.85,
+                thighR: isKick ? [-1.55, 0, 0.1] : [-0.45, 0, 0.15],
+                kneeR: isKick ? 0.15 : 0.75
+              });
+            });
+          }
+        }
+
+        // ======================================================================
+        // ACT 3 (26.0s – 43.0s): MARJOHN'S SPOTLIGHT (TEMPLE RUINS COLLISION & KO)
+        // ======================================================================
+        else if (t < 43.0) {
+          // Background fighters recover & observe from east/south meadow
+          poseFighter(fighters.prime, { ...getMartialGuardPose(t, 0.4, 'heavy'), x: 6.5, z: 4.5, rotY: -2.2 });
+          poseFighter(fighters.khen,  { ...getMartialGuardPose(t, 1.8, 'daggers'), x: 7.2, z: -4.2, rotY: -1.8 });
+
+          if (t < 39.2) {
+            // Marjohn leaps onto the Western Ruined Temple archway, runs along pillars & unleashes Azure Wind Vortex
+            const phase = t - 26.0;
+            if (phase < 6.0) {
+              // Fluid curved aerial dash & pillar perch on Western Temple
+              const p1 = smoothstep(0.0, 2.5, phase);
+              const mx = lerp(-5.0, -15.4, p1);
+              const my = lerp(0.5, 4.65, p1);
+              const mz = lerp(1.0, -3.5, p1);
+              if (phase >= 2.4 && phase <= 2.6 && !isScrub) {
+                triggerMilestone('marjohn-perch', () => {
+                  spawnShockwave(mx, mz, 5.5, 0x38bdf8, 0.95);
+                  audioEngine.playEvent('marjohn-perch-sfx', 'wind');
+                });
+              }
+              poseFighter(fighters.marjohn, {
+                ...getMartialGuardPose(t, 0, 'staff'),
+                x: mx,
+                y: my,
+                z: mz,
+                rotY: 1.57,
+                leanX: p1 < 1 ? 0.45 : 0,
+                eyeState: 'fierce',
+                auraOpacity: 0.92,
+                active: true
+              });
+              if (fighters.marjohn.weapons.staff) fighters.marjohn.weapons.staff.rotation.y = t * 24;
+
+              // JM & Damen pursue toward the Western Temple plaza
+              const pursueP = smoothstep(1.0, 5.5, phase);
+              const strideJ = getRunStridePose(t * 14, (1 - pursueP) * 0.9);
+              poseFighter(fighters.jm, {
+                ...strideJ,
+                x: lerp(2.0, -8.8, pursueP),
+                y: 0,
+                z: lerp(1.5, -2.5, pursueP),
+                rotY: -1.57,
+                eyeState: 'fierce',
+                auraOpacity: 0.65,
+                active: true
+              });
+              poseFighter(fighters.damen, {
+                ...getMartialGuardPose(t, 0.9, 'guns'),
+                x: lerp(1.0, -7.2, pursueP),
+                y: 0,
+                z: lerp(4.0, 1.8, pursueP),
+                rotY: -2.1,
+                eyeState: 'fierce',
+                auraOpacity: 0.5
+              });
+
+              camDest.set(-9.5, 5.2, 6.8);
+              lookDest.set(-13.5, 2.8, -3.2);
+            } else {
+              // 32.0s – 39.2s: Marjohn dives from temple roof in sweeping Azure Wind cyclone vs JM & Damen
+              const duelT = phase - 6.0;
+              const mx = -10.8 + Math.sin(duelT * 1.8) * 2.2;
+              const my = Math.abs(Math.cos(duelT * 2.2)) * 1.8;
+              const mz = -3.5 + Math.cos(duelT * 1.5) * 1.8;
+              if (Math.floor(duelT * 3.5) !== Math.floor((duelT - 0.02) * 3.5) && !isScrub) {
+                spawnSlashArc(mx, my + 1.2, mz, Math.PI * 0.4, duelT * 6, 0.2, 1.65, 0x38bdf8);
+                spawnAfterimage(mx - 0.5, my, mz, 1.57, 0x38bdf8);
+              }
+              poseFighter(fighters.marjohn, {
+                x: mx,
+                y: my,
+                z: mz,
+                rotY: duelT * 12,
+                leanX: 0.25,
+                torsoYaw: 0.45,
+                armLAngle: [-1.35, 0.5, -0.2],
+                elbowL: -0.45,
+                armRAngle: [-1.35, -0.5, 0.2],
+                elbowR: -0.45,
+                thighL: [-0.35, 0, -0.15],
+                kneeL: 0.55,
+                thighR: [0.35, 0, 0.15],
+                kneeR: 0.55,
+                eyeState: 'fierce',
+                auraOpacity: 0.92,
+                active: true
+              });
+              if (fighters.marjohn.weapons.staff) fighters.marjohn.weapons.staff.rotation.y = t * 28;
+
+              poseFighter(fighters.jm, {
+                ...getMartialGuardPose(t, 0.3),
+                x: -8.6,
+                y: 0,
+                z: -3.5,
+                rotY: -1.57,
+                eyeState: 'fierce',
+                auraOpacity: 0.78,
+                active: true
+              });
+              poseFighter(fighters.damen, {
+                ...getMartialGuardPose(t, 1.2, 'guns'),
+                x: -7.5,
+                y: 0,
+                z: 0.8,
+                rotY: -2.2
+              });
+
+              camDest.set(-6.5, 3.4, 6.2);
+              lookDest.set(-10.5, 1.6, -3.2);
+            }
+          } else {
+            // 39.2s – 43.0s: Dramatic Reversal! JM's Golden Dragon Uppercut blasts Marjohn straight through Western Temple!
+            if (t < 39.85) {
+              // JM flash-steps inside Marjohn's wind guard & delivers Golden Dragon Uppercut
+              const upP = smoothstep(39.2, 39.85, t);
+              if (t >= 39.72 && !isScrub) {
+                triggerMilestone('jm-temple-uppercut', () => {
+                  spawnSlashArc(-9.8, 1.5, -3.5, 0, 0, 0.3, 1.55, 0xfacc15);
+                  spawnHitSparks(-9.8, 1.5, -3.5, 0xfef08a, 12);
+                  audioEngine.playEvent('jm-temple-up-sfx', 'clash');
+                });
+              }
+              poseFighter(fighters.jm, {
+                x: lerp(-8.6, -9.8, upP),
+                y: upP * 1.9,
+                z: -3.5,
+                rotY: -1.57 + upP * 0.4,
+                leanX: 0.25,
+                torsoYaw: 0.65,
+                armLAngle: [-0.6, 0.3, -0.4],
+                elbowL: -1.2,
+                armRAngle: [-2.75, -0.1, 0.1],
+                elbowR: -0.2,
+                thighL: [-0.95, 0, -0.1],
+                kneeL: 1.35,
+                thighR: [0.4, 0, 0.1],
+                kneeR: 0.25,
+                eyeState: 'fierce',
+                auraOpacity: 0.96,
+                active: true
+              });
+              poseFighter(fighters.marjohn, {
+                x: -10.4,
+                y: upP * 2.2,
+                z: -3.5,
+                rotY: 1.57,
+                leanX: -0.65 * upP,
+                eyeState: 'shock',
+                auraOpacity: 0.6,
+                active: true
+              });
+              camDest.set(-7.5, 2.8, 4.5);
+              lookDest.set(-10.5, 1.8, -3.5);
+            } else {
+              // 39.85s – 43.0s: Marjohn rockets backward through Western Temple Archway (t=40.5s) -> MARJOHN KO!
+              const flyP = clamp((t - 39.85) / 1.45, 0, 1);
+              const mx = lerp(-10.4, -19.2, flyP);
+              const my = lerp(2.2, 0.25, flyP) + Math.sin(flyP * Math.PI) * 1.1;
+              const mz = -3.5;
+
+              if (t >= 40.48 && t <= 40.62 && !isScrub) {
+                triggerMilestone('temple-shatter-vfx', () => {
+                  spawnShockwave(-16.2, -3.5, 11.5, 0x38bdf8, 1.45);
+                  spawnHitSparks(-16.2, 2.4, -3.5, 0xfef08a, 14);
+                  camShakeSpring.impulse(1.9);
+                  audioEngine.playEvent('temple-shatter-sfx', 'shatter');
+                });
+              }
+              if (t >= 42.15 && t <= 42.3 && !isScrub) {
+                triggerCallout('marjohn-ko', 'MARJOHN KO!', '#38bdf8', true);
+                audioEngine.playEvent('marjohn-ko-sfx', 'ko');
+              }
+
+              if (t >= 42.2) {
+                poseFighter(fighters.marjohn, getKOPose(-19.2, -3.5, 1.57));
+              } else {
+                poseFighter(fighters.marjohn, {
+                  x: mx,
+                  y: my,
+                  z: mz,
+                  rotY: 1.57,
+                  leanX: -1.4 - flyP * Math.PI * 2,
+                  armLAngle: [-2.1, 0, -0.5],
+                  elbowL: -0.3,
+                  armRAngle: [-2.1, 0, 0.5],
+                  elbowR: -0.3,
+                  eyeState: 'shock',
+                  auraOpacity: 0.35,
+                  active: true
+                });
+              }
+              poseFighter(fighters.jm, { ...getMartialGuardPose(t, 0.2), x: -9.8, y: 0, z: -3.5, rotY: -1.57, eyeState: 'fierce', auraOpacity: 0.55 });
+              poseFighter(fighters.damen, { ...getMartialGuardPose(t, 1.1, 'guns'), x: -7.5, z: 0.8, rotY: -2.2 });
+
+              camDest.set(-11.2, 3.8, 6.5);
+              lookDest.set(-16.5, 1.8, -3.5);
+            }
+          }
+        }
+
+        // ======================================================================
+        // ACT 4 (43.0s – 59.0s): PRIME'S SPOTLIGHT (BOULDER SMASH, CLIFF AVALANCHE & KO)
+        // ======================================================================
+        else if (t < 59.0) {
+          poseFighter(fighters.marjohn, getKOPose(-19.2, -3.5, 1.57));
+          poseFighter(fighters.damen, { ...getMartialGuardPose(t, 1.2, 'guns'), x: -4.5, z: 5.5, rotY: 2.3 });
+
+          const phase = t - 43.0;
+          if (phase < 10.5) {
+            // Prime erupts with Crimson Blaze acceleration, shatters boulder at 46.2s, hurls rolling boulder at 49.5s
+            if (phase < 3.6) {
+              // Rocket-dash straight through primeShatterBoulder at (9.2, 4.2) at t = 46.2s
+              const dashP = smoothstep(0.5, 3.3, phase);
+              const px = lerp(1.5, 10.2, dashP);
+              const pz = lerp(2.5, 4.2, dashP);
+              if (t >= 46.15 && t <= 46.3 && !isScrub) {
+                triggerMilestone('prime-boulder-smash', () => {
+                  spawnShockwave(9.2, 4.2, 8.5, 0xf43f5e, 1.35);
+                  spawnHitSparks(9.2, 1.1, 4.2, 0xf43f5e, 14);
+                  camShakeSpring.impulse(1.5);
+                  audioEngine.playEvent('prime-boulder-sfx', 'shatter');
+                });
+              }
+              const stride = getRunStridePose(t * 20, 1.15);
+              poseFighter(fighters.prime, {
+                ...stride,
+                x: px,
+                y: 0,
+                z: pz,
+                rotY: 1.35,
+                armRAngle: [-1.57, -0.1, 0.1],
+                elbowR: -0.12,
+                eyeState: 'fierce',
+                auraOpacity: 0.96,
+                active: true
+              });
+              poseFighter(fighters.khen, { ...getMartialGuardPose(t, 0.6, 'daggers'), x: 6.5, z: -3.2, rotY: -0.4 });
+              poseFighter(fighters.jm,   { ...getMartialGuardPose(t, 1.4), x: 3.5, z: -2.0, rotY: 0.5 });
+
+              camDest.set(5.5, 2.8, 11.2);
+              lookDest.set(px, 1.25, pz);
+            } else if (phase < 7.2) {
+              // 46.6s – 50.2s: Prime unleashes Crimson Meteor Ground Slam (crater at 47.5s) & hurls rolling boulder (49.5s)
+              const slamP = clamp((t - 46.8) / 0.72, 0, 1);
+              const py = t >= 46.8 && t <= 47.52 ? Math.sin(slamP * Math.PI) * 3.8 : 0;
+              if (t >= 47.48 && t <= 47.6 && !isScrub) {
+                triggerMilestone('prime-crater-slam', () => {
+                  spawnShockwave(2.5, 1.2, 10.5, 0xf43f5e, 1.45);
+                  spawnHitSparks(2.5, 0.4, 1.2, 0xf43f5e, 14);
+                  camShakeSpring.impulse(1.7);
+                  audioEngine.playEvent('prime-crater-sfx', 'clash');
+                });
+              }
+              const px = t < 48.2 ? lerp(10.2, 2.5, smoothstep(46.6, 47.5, t)) : lerp(2.5, 6.2, smoothstep(48.2, 49.6, t));
+              const pz = t < 48.2 ? lerp(4.2, 1.2, smoothstep(46.6, 47.5, t)) : lerp(1.2, -5.6, smoothstep(48.2, 49.6, t));
+              poseFighter(fighters.prime, {
+                ...getMartialGuardPose(t, 0.2, 'heavy'),
+                x: px,
+                y: py,
+                z: pz,
+                rotY: -1.4,
+                armRAngle: t >= 49.3 && t <= 49.8 ? [-1.55, 0, 0.1] : [-0.95, 0.35, -0.35],
+                elbowR: t >= 49.3 && t <= 49.8 ? -0.15 : -1.45,
+                eyeState: 'fierce',
+                auraOpacity: 0.95,
+                active: true
+              });
+              poseFighter(fighters.jm,   { ...getMartialGuardPose(t, 0.8), x: 1.5, y: t >= 47.4 && t <= 48.0 ? 1.4 : 0, z: -2.2, rotY: 0.3 });
+              poseFighter(fighters.khen, { ...getMartialGuardPose(t, 1.6, 'daggers'), x: 8.5, z: -2.2, rotY: -1.57 });
+
+              camDest.set(2.0, 3.6, 11.5);
+              lookDest.set(px, 1.3, pz);
+            } else {
+              // 50.2s – 53.5s: Prime charges headlong at Khen & JM with blazing crimson haymaker barrage
+              const pRush = smoothstep(50.2, 53.5, t);
+              const px = lerp(6.2, 10.5, pRush);
+              const pz = lerp(-5.6, -2.0, pRush);
+              poseFighter(fighters.prime, {
+                ...getRunStridePose(t * 19, 1.1),
+                x: px,
+                y: 0,
+                z: pz,
+                rotY: 1.57,
+                eyeState: 'fierce',
+                auraOpacity: 0.95,
+                active: true
+              });
+              poseFighter(fighters.khen, { ...getMartialGuardPose(t, 0.4, 'daggers'), x: 11.8, z: -2.0, rotY: -1.57, eyeState: 'fierce', auraOpacity: 0.85, active: true });
+              poseFighter(fighters.jm,   { ...getMartialGuardPose(t, 1.1), x: 11.2, y: smoothstep(52.5, 53.5, t) * 3.4, z: -3.2, rotY: -1.2, eyeState: 'fierce', auraOpacity: 0.85, active: true });
+
+              camDest.set(8.5, 3.2, 7.8);
+              lookDest.set(11.2, 1.5, -2.0);
+            }
+          } else {
+            // 53.5s – 59.0s: Khen's Arcane Violet Spatial Redirect + JM's Spinning Golden Heel Drop -> Eastern Cliff Avalanche (t=56.5s) -> PRIME KO!
+            if (t < 55.2) {
+              // Khen deflects Prime's punch upward with Violet X-Parry while JM ascends
+              const parryP = smoothstep(53.5, 54.6, t);
+              if (t >= 54.35 && t <= 54.5 && !isScrub) {
+                triggerMilestone('khen-cliff-parry', () => {
+                  spawnShockwave(11.4, -2.0, 7.5, 0xa855f7, 1.2);
+                  spawnSlashArc(11.4, 1.65, -2.0, 0.2, 1.57, 0.78, 1.35, 0xa855f7);
+                  spawnSlashArc(11.4, 1.65, -2.0, 0.2, 1.57, -0.78, 1.35, 0xa855f7);
+                  spawnHitSparks(11.4, 1.65, -2.0, 0xfef08a, 10);
+                  audioEngine.playEvent('khen-cliff-parry-sfx', 'clash');
+                });
+              }
+              poseFighter(fighters.prime, {
+                x: 11.0,
+                y: parryP * 2.4,
+                z: -2.0,
+                rotY: 1.57,
+                leanX: -0.45 * parryP,
+                eyeState: parryP > 0.7 ? 'shock' : 'fierce',
+                auraOpacity: 0.85,
+                active: true
+              });
+              poseFighter(fighters.khen, {
+                ...getMartialGuardPose(t, 0.2, 'daggers'),
+                x: 12.2,
+                z: -2.0,
+                rotY: -1.57,
+                armLAngle: [-1.75, 0.45, -0.25],
+                elbowL: -0.25,
+                armRAngle: [-1.75, -0.45, 0.25],
+                elbowR: -0.25,
+                eyeState: 'fierce',
+                auraOpacity: 0.9,
+                active: true
+              });
+              poseFighter(fighters.jm, {
+                x: 11.2,
+                y: 3.6,
+                z: -2.0,
+                rotY: 1.57,
+                leanZ: -0.55,
+                thighR: [-1.85, 0, 0.3],
+                kneeR: 0.1,
+                eyeState: 'fierce',
+                auraOpacity: 0.92,
+                active: true
+              });
+              camDest.set(8.2, 3.6, 6.8);
+              lookDest.set(11.5, 2.2, -2.0);
+            } else {
+              // 55.2s – 59.0s: JM's Spinning Golden Heel Drop slams Prime into Eastern Highland Cliff (56.5s) -> PRIME KO (58.2s)!
+              const slamCliffP = clamp((t - 55.2) / 1.35, 0, 1);
+              const px = lerp(11.0, 18.6, slamCliffP);
+              const py = lerp(2.4, 0.4, slamCliffP);
+              const pz = -2.0;
+
+              if (t >= 55.25 && t <= 55.4 && !isScrub) {
+                triggerMilestone('jm-cliff-kick', () => {
+                  spawnShockwave(11.2, -2.0, 8.5, 0xfacc15, 1.3);
+                  spawnSlashArc(11.2, 2.6, -2.0, Math.PI * 0.42, 0.3, 0.2, 1.55, 0xfacc15);
+                  spawnHitSparks(11.2, 2.6, -2.0, 0xfacc15, 12);
+                  audioEngine.playEvent('jm-cliff-kick-sfx', 'clash');
+                });
+              }
+              if (t >= 56.48 && t <= 56.62 && !isScrub) {
+                triggerMilestone('cliff-rockslide-vfx', () => {
+                  spawnShockwave(18.5, -2.0, 12.0, 0xf43f5e, 1.5);
+                  spawnHitSparks(18.5, 2.4, -2.0, 0xfef08a, 14);
+                  camShakeSpring.impulse(1.95);
+                  audioEngine.playEvent('cliff-rockslide-sfx', 'rockslide');
+                });
+              }
+              if (t >= 58.15 && t <= 58.3 && !isScrub) {
+                triggerCallout('prime-ko', 'PRIME KO!', '#f43f5e', true);
+                audioEngine.playEvent('prime-ko-sfx', 'ko');
+              }
+
+              poseFighter(fighters.jm, {
+                x: 11.4,
+                y: lerp(3.6, 0, clamp((t - 55.2) / 0.8, 0, 1)),
+                z: -2.0,
+                rotY: 1.57 + slamCliffP * Math.PI * 2,
+                eyeState: 'fierce',
+                auraOpacity: 0.78,
+                active: true
+              });
+              poseFighter(fighters.khen, { ...getMartialGuardPose(t, 0.5, 'daggers'), x: 12.4, z: -3.6, rotY: 1.2 });
+
+              if (t >= 58.2) {
+                poseFighter(fighters.prime, getKOPose(18.2, -2.0, 1.57));
+              } else {
+                poseFighter(fighters.prime, {
+                  x: px,
+                  y: py,
+                  z: pz,
+                  rotY: 1.57,
+                  leanX: -1.45,
+                  eyeState: 'shock',
+                  auraOpacity: 0.4,
+                  active: true
+                });
+              }
+
+              camDest.set(12.2, 4.0, 6.8);
+              lookDest.set(17.8, 1.8, -2.0);
+            }
+          }
+        }
+
+        // ======================================================================
+        // ACT 5 (59.0s – 76.0s): DAMEN'S SPOTLIGHT (WATER-SKIPPING, LASSO & KO)
+        // ======================================================================
+        else if (t < 76.0) {
+          poseFighter(fighters.marjohn, getKOPose(-19.2, -3.5, 1.57));
+          poseFighter(fighters.prime,   getKOPose(18.2, -2.0, 1.57));
+
+          const phase = t - 59.0;
+          if (phase < 10.5) {
+            // Damen leaps onto the Northern Reflective Stream, water-skips with 3D splash plumes & snares Khen with Golden Lasso!
+            const waterP = smoothstep(0.0, 2.2, phase);
+            const dx = phase < 2.2 ? lerp(-4.5, -6.5, waterP) : -6.5 + ((phase - 2.2) / 8.3) * 14.5;
+            const skipBounce = phase >= 2.2 ? Math.abs(Math.sin((phase - 2.2) * 3.8)) * 1.15 : 0;
+            const dz = phase < 2.2 ? lerp(5.5, getStreamZ(-6.5), waterP) : getStreamZ(dx);
+
+            // Spawn 3D water splash plumes & expanding ripples every time Damen's boots touch the stream!
+            if (phase >= 2.2 && skipBounce < 0.14 && !isScrub) {
+              const splashKey = `water-skip-${Math.floor((phase - 2.2) * 3.8)}`;
+              triggerMilestone(splashKey, () => {
+                spawnShockwave(dx, dz, 3.8, 0x7dd3fc, 0.85);
+                spawnHitSparks(dx, 0.35, dz, 0xe0f2fe, 8);
+                audioEngine.playEvent(`${splashKey}-sfx`, 'splash');
+              });
+            }
+
+            if (Math.floor(t * 4.5) !== Math.floor((t - 0.02) * 4.5) && !isScrub) {
+              audioEngine.playEvent(`act5-gun-${Math.floor(t * 4.5)}`, 'gunshot');
+              spawnHitSparks(dx + 0.4, skipBounce + 1.1, dz + 0.5, 0xfacc15, 4);
+            }
+
+            poseFighter(fighters.damen, {
+              x: dx,
+              y: skipBounce + 0.18,
+              z: dz,
+              rotY: 0.45 + Math.sin(phase * 2.5) * 0.4,
+              leanX: 0.22,
+              torsoYaw: Math.sin(phase * 5) * 0.45,
+              armLAngle: [-1.45, -0.35, -0.2],
+              elbowL: -0.25,
+              armRAngle: [-1.45, 0.35, 0.2],
+              elbowR: -0.25,
+              thighL: [-0.45, 0, -0.15],
+              kneeL: 0.75,
+              thighR: [0.35, 0, 0.15],
+              kneeR: 0.65,
+              eyeState: 'fierce',
+              auraOpacity: 0.78,
+              active: true
+            });
+
+            // Khen & JM pursue along the southern bank of the stream; Damen snares Khen with Golden Lasso at t = 66.5s!
+            const kx = lerp(8.5, 3.2, smoothstep(0.5, 6.5, phase));
+            const kz = getStreamZ(kx) + 3.4;
+            const lassoActive = t >= 66.5 && t <= 69.2;
+            if (lassoActive) {
+              goldenLasso.visible = true;
+              const lp = clamp((t - 66.5) / 0.45, 0, 1);
+              goldenLasso.position.set(lerp(dx, kx, lp), 1.05, lerp(dz, kz, lp));
+              goldenLasso.scale.setScalar(lerp(1.4, 0.72, lp));
+              if (t >= 66.52 && t <= 66.65 && !isScrub) {
+                triggerMilestone('damen-lasso-snare', () => {
+                  audioEngine.playEvent('lasso-sfx', 'whoosh');
+                });
+              }
+            }
+
+            poseFighter(fighters.khen, {
+              ...getMartialGuardPose(t, 0.4, 'daggers'),
+              x: kx,
+              z: kz,
+              rotY: -0.4,
+              armLAngle: lassoActive ? [0, 0, 0.12] : [-0.65, 0.32, -0.35],
+              elbowL: lassoActive ? -0.15 : -1.42,
+              armRAngle: lassoActive ? [0, 0, -0.12] : [-0.65, -0.32, 0.35],
+              elbowR: lassoActive ? -0.15 : -1.42,
+              eyeState: lassoActive ? 'shock' : 'fierce',
+              auraOpacity: 0.65
+            });
+
+            poseFighter(fighters.jm, {
+              ...getMartialGuardPose(t, 1.3),
+              x: lerp(6.5, -1.5, smoothstep(0.5, 7.0, phase)),
+              z: getStreamZ(0) + 4.2,
+              rotY: -0.2,
+              eyeState: 'fierce',
+              auraOpacity: 0.65
+            });
+
+            camDest.set(dx * 0.6, 3.4, dz + 9.2);
+            lookDest.set(dx, 1.1, dz + 1.0);
+          } else {
+            // 69.5s – 76.0s: Khen blinks free from Golden Lasso -> Khen & JM coordinated aerial pincer strike -> Hat lands on boulder -> DAMEN KO!
+            const endT = t - 69.5;
+            if (endT < 3.3) {
+              // Khen teleports free & exchanges aerial strikes with Damen above the northern meadow
+              const hitIdx = Math.min(3, Math.floor(endT / 0.75));
+              const dirs = [[1.2, 0], [-1.2, 0], [0, 1.2], [0, -1.2]];
+              const [ox, oz] = dirs[hitIdx];
+              if (!isScrub) {
+                triggerMilestone(`act5-khen-combo-${hitIdx}`, () => {
+                  spawnShockwave(2.0, -8.5, 5.2, 0xa855f7, 0.95);
+                  spawnAfterimage(2.0 + ox * 1.5, 1.2, -8.5 + oz * 1.5, 0, 0xa855f7);
+                  spawnSlashArc(2.0, 2.2, -8.5, 0.4, hitIdx * 1.57, 0.5, 1.45, 0xa855f7);
+                  spawnHitSparks(2.0, 2.2, -8.5, 0xa855f7, 8);
+                  audioEngine.playEvent(`act5-combo-${hitIdx}`, 'whoosh');
+                });
+              }
+              poseFighter(fighters.damen, {
+                x: 2.0,
+                y: 1.6,
+                z: -8.5,
+                rotY: endT * 8,
+                leanX: -0.35,
+                eyeState: 'shock',
+                auraOpacity: 0.6,
+                active: true
+              });
+              poseFighter(fighters.khen, {
+                x: 2.0 + ox,
+                y: 1.8,
+                z: -8.5 + oz,
+                rotY: Math.atan2(-ox, -oz),
+                leanX: 0.4,
+                eyeState: 'fierce',
+                auraOpacity: 0.92,
+                active: true
+              });
+              poseFighter(fighters.jm, {
+                x: lerp(-1.5, 2.0, smoothstep(1.5, 3.2, endT)),
+                y: smoothstep(1.5, 3.2, endT) * 2.8,
+                z: lerp(-14.0, -7.2, smoothstep(1.5, 3.2, endT)),
+                rotY: 3.14,
+                eyeState: 'fierce',
+                auraOpacity: 0.85,
+                active: true
+              });
+              camDest.set(2.0, 4.2, -1.2);
+              lookDest.set(2.0, 1.8, -8.5);
+            } else {
+              // 72.8s – 76.0s: Pincer finishing strike! Cowboy hat flies onto boulder, Damen crashes at (7.5, 6.2) -> DAMEN KO!
+              const knockP = clamp((t - 72.8) / 1.9, 0, 1);
+              if (t >= 72.82 && t <= 72.95 && !isScrub) {
+                triggerMilestone('damen-pincer-hit', () => {
+                  spawnShockwave(2.0, -8.5, 9.5, 0xfacc15, 1.35);
+                  spawnHitSparks(2.0, 2.2, -8.5, 0xfef08a, 12);
+                  audioEngine.playEvent('damen-pincer-sfx', 'clash');
+                });
+              }
+              if (t >= 74.95 && t <= 75.1 && !isScrub) {
+                triggerCallout('damen-ko', 'DAMEN KO!', '#f59e0b', true);
+                audioEngine.playEvent('damen-ko-sfx', 'ko');
+              }
+
+              poseFighter(fighters.khen, { ...getMartialGuardPose(t, 0.3, 'daggers'), x: 1.2, y: 0, z: -7.5, rotY: 0.5 });
+              poseFighter(fighters.jm,   { ...getMartialGuardPose(t, 1.0), x: 3.2, y: 0, z: -7.5, rotY: 0.3 });
+
+              if (t >= 75.0) {
+                poseFighter(fighters.damen, getKOPose(7.5, 6.2, -0.8));
+              } else {
+                poseFighter(fighters.damen, {
+                  x: lerp(2.0, 7.5, knockP),
+                  y: lerp(1.6, 0.16, knockP) + Math.sin(knockP * Math.PI) * 2.2,
+                  z: lerp(-8.5, 6.2, knockP),
+                  rotY: -0.8,
+                  leanX: -1.42 - knockP * Math.PI * 2,
+                  eyeState: 'shock',
+                  auraOpacity: 0.35,
+                  active: true
+                });
+              }
+
+              camDest.set(4.5, 3.6, 12.2);
+              lookDest.set(lerp(2.0, 7.5, knockP), 1.4, lerp(-8.5, 6.2, knockP));
+            }
+          }
+        }
+
+        // ======================================================================
+        // ACT 6 (76.0s – 94.0s): KHEN VS. JM RIVALRY (TWILIGHT STORM & GLASSES GLINT)
+        // ======================================================================
+        else if (t < 94.0) {
+          poseFighter(fighters.marjohn, getKOPose(-19.2, -3.5, 1.57));
+          poseFighter(fighters.prime,   getKOPose(18.2, -2.0, 1.57));
+          poseFighter(fighters.damen,   getKOPose(7.5, 6.2, -0.8));
+
+          if (t < 81.5) {
+            // Dramatic atmospheric shift + close-up on Khen's white glasses lens-glint
+            if (fighters.khen.glassesGlint && t >= 78.2 && t <= 80.4) {
+              fighters.khen.glassesGlint.visible = true;
+              const gs = Math.sin(((t - 78.2) / 2.2) * Math.PI) * 1.55;
+              fighters.khen.glassesGlint.scale.setScalar(Math.max(0.01, gs));
+              if (t >= 78.4 && t <= 78.55 && !isScrub) {
+                triggerMilestone('act6-khen-glint', () => {
+                  audioEngine.playEvent('khen-glint-sfx', 'whoosh');
+                });
+              }
+            }
+
+            poseFighter(fighters.khen, {
+              ...getMartialGuardPose(t, 0.2, 'daggers'),
+              x: -4.2,
+              z: 0,
+              rotY: 1.57,
+              eyeState: 'fierce',
+              auraOpacity: 0.88,
+              active: true,
+              armRAngle: t >= 78.0 && t <= 80.5 ? [-2.15, 0.32, 0.1] : [-0.65, -0.32, 0.35],
+              elbowR: t >= 78.0 && t <= 80.5 ? -1.65 : -1.42
+            });
+            poseFighter(fighters.jm, {
+              ...getMartialGuardPose(t, 1.5),
+              x: 4.2,
+              z: 0,
+              rotY: -1.57,
+              eyeState: 'fierce',
+              auraOpacity: 0.88,
+              active: true
+            });
+
+            if (t < 80.2) {
+              camDest.set(-2.5, 1.85, 2.7);
+              lookDest.set(-4.2, 1.68, 0);
+            } else {
+              camDest.set(0, 2.9, 10.8);
+              lookDest.set(0, 1.3, 0);
+            }
+          } else {
+            // 81.5s – 94.0s: Supersonic Violet vs Gold flash-step clashes across central crater & temple steps!
+            const stepT = (t - 81.5) * 3.8;
+            const cx = Math.sin(stepT * 0.95) * 5.2;
+            const cy = Math.abs(Math.sin(stepT * 1.4)) * 1.8;
+            const cz = Math.cos(stepT * 0.85) * 3.2;
+            const cyclePhase = stepT % 2.0;
+
+            const clashBucket = Math.floor(stepT);
+            if (!isScrub) {
+              triggerMilestone(`act6-clash-${clashBucket}`, () => {
+                const isGold = clashBucket % 2 === 0;
+                spawnShockwave(cx, cz, 5.5, isGold ? 0xfacc15 : 0xa855f7, 0.95);
+                spawnAfterimage(cx - 0.6, cy, cz, 1.57, 0xa855f7);
+                spawnAfterimage(cx + 0.6, cy, cz, -1.57, 0xfacc15);
+                spawnSlashArc(cx, cy + 1.25, cz, Math.PI * 0.42, stepT * 2, 0.25, 1.35, isGold ? 0xfacc15 : 0xa855f7);
+                spawnHitSparks(cx, cy + 1.25, cz, 0xfef08a, 8);
+                audioEngine.playEvent(`rivalry-clash-${clashBucket}`, 'clash');
+              });
+            }
+
+            actionPointLight.color.setHex(clashBucket % 2 === 0 ? 0xfacc15 : 0xa855f7);
+            actionPointLight.position.set(cx, cy + 1, cz);
+            actionPointLight.intensity = 4.5;
+
+            const isLowSweep = cyclePhase >= 1.0;
+            poseFighter(fighters.khen, {
+              x: cx - 0.65,
+              y: isLowSweep ? 0 : cy,
+              z: cz,
+              rotY: 1.57 + (isLowSweep ? cyclePhase * 3.1 : 0),
+              hipY: isLowSweep ? -0.35 : -0.1,
+              leanZ: isLowSweep ? 0.52 : -0.25,
+              torsoYaw: 0.6,
+              eyeState: 'fierce',
+              auraOpacity: 0.95,
+              active: true,
+              armLAngle: [-1.5, -0.3, -0.3],
+              elbowL: -0.25,
+              armRAngle: [-1.5, 0.3, 0.3],
+              elbowR: -0.25,
+              thighL: [-0.45, 0, -0.15],
+              kneeL: isLowSweep ? 1.35 : 0.65,
+              thighR: isLowSweep ? [-1.45, 0, 0.25] : [0.45, 0, 0.15],
+              kneeR: 0.15
+            });
+
+            poseFighter(fighters.jm, {
+              x: cx + 0.65,
+              y: isLowSweep ? 1.35 : cy,
+              z: cz,
+              rotY: -1.57 - (isLowSweep ? 0.85 : 0),
+              leanZ: isLowSweep ? -0.45 : 0.2,
+              torsoYaw: -0.55,
+              eyeState: 'fierce',
+              auraOpacity: 0.95,
+              active: true,
+              armLAngle: [-1.1, 0.4, -0.2],
+              elbowL: -1.25,
+              armRAngle: [-1.3, -0.3, 0.2],
+              elbowR: -0.35,
+              thighL: [-0.65, 0, -0.1],
+              kneeL: 1.15,
+              thighR: isLowSweep ? [-1.72, 0, 0.35] : [0.35, 0, 0.15],
+              kneeR: isLowSweep ? 0.12 : 0.55
+            });
+
+            camDest.set(cx * 0.45, 3.4, 11.6);
+            lookDest.set(cx, cy + 0.85, cz);
+          }
+        }
+
+        // ======================================================================
+        // ACT 7 (94.0s – 110.0s): THE FINAL CLASH (EARNED BUILDUP & SOLAR DRAGON BEAM)
+        // ======================================================================
+        else if (t < 110.0) {
+          poseFighter(fighters.marjohn, getKOPose(-19.2, -3.5, 1.57));
+          poseFighter(fighters.prime,   getKOPose(18.2, -2.0, 1.57));
+          poseFighter(fighters.damen,   getKOPose(7.5, 6.2, -0.8));
+
+          // Phase A (94.0–101.0s): High-altitude aerial duel & Khen's Dark-Violet Crescent Barrage
+          // Phase B (101.0–105.0s): JM awakens Golden Sovereign Crown Halo & charges Solar Dragon Sphere
+          // Phase C (105.0–110.0s): Full-scale Solar Dragon Beam finisher -> KHEN KO at 109.0s!
+          const jmAscend = smoothstep(95.0, 101.5, t);
+          const jmY = jmAscend * 3.4;
+
+          if (fighters.jm.crownHalo && t >= 100.5) {
+            fighters.jm.crownHalo.visible = true;
+            fighters.jm.crownHalo.rotation.z = t * 1.8;
+            const hs = smoothstep(100.5, 102.0, t);
+            fighters.jm.crownHalo.scale.setScalar(hs);
+          }
+
+          if (t >= 101.2 && t <= 101.4 && !isScrub) {
+            triggerMilestone('jm-halo-charge', () => {
+              spawnShockwave(6.2, 0, 11.0, 0xfacc15, 1.2);
+              audioEngine.playEvent('jm-charge-sfx', 'charge');
+            });
+          }
+
+          // Charging Golden Sphere between JM's hands (101.5s – 105.0s)
+          if (t >= 101.5 && t < 105.0) {
+            jmChargeSphere.visible = true;
+            const cs = smoothstep(101.5, 104.8, t) * (1.1 + Math.sin(t * 28) * 0.14);
+            jmChargeSphere.position.set(5.4, jmY + 1.15, 0);
+            jmChargeSphere.scale.setScalar(Math.max(0.05, cs));
+            actionPointLight.color.setHex(0xfacc15);
+            actionPointLight.position.set(5.4, jmY + 1.15, 0);
+            actionPointLight.intensity = 4.2;
+          }
+
+          // Khen's Dark-Violet Crescent Wave (97.5s – 106.2s)
+          if (t >= 97.5 && t < 106.2) {
+            violetCrescent.visible = true;
+            const vp = clamp((t - 97.5) / 7.5, 0, 1);
+            violetCrescent.position.set(lerp(-5.8, 3.8, vp), 1.4 + vp * 1.7, 0);
+            violetCrescent.rotation.y = Math.PI * 0.5;
+            violetCrescent.scale.setScalar(1.0 + vp * 0.85);
+          }
+
+          // JM unleashes the Golden Solar Dragon Beam at t = 105.0s!
+          if (t >= 105.0) {
+            solarBeamGroup.visible = true;
+            const bp = clamp((t - 105.0) / 0.65, 0, 1);
+            solarBeamGroup.position.set(5.4, jmY + 1.15, 0);
+            solarBeamGroup.rotation.z = 0.25;
+            solarBeamGroup.scale.set(bp, 1.0 + Math.sin(t * 35) * 0.12, 1.0 + Math.cos(t * 35) * 0.12);
+            dragonHead.position.set(-14.5 * bp, Math.sin(t * 24) * 0.25, Math.cos(t * 24) * 0.25);
+
+            actionPointLight.color.setHex(0xfacc15);
+            actionPointLight.position.set(-1.5, 2.2, 0);
+            actionPointLight.intensity = 7.8;
+
+            if (t >= 105.02 && t <= 105.15 && !isScrub) {
+              triggerMilestone('solar-dragon-beam-sfx', () => {
+                audioEngine.playEvent('solar-dragon-beam', 'beam');
+              });
+            }
+            if (t >= 105.85 && t <= 106.0 && !isScrub) {
+              triggerCallout('solar-dragon', 'SOLAR DRAGON BEAM!', '#facc15', true);
+              triggerMilestone('solar-beam-wave', () => {
+                spawnShockwave(-2.0, 0, 18.5, 0xfacc15, 1.6);
+                spawnHitSparks(-5.8, 1.3, 0, 0xfacc15, 16);
+              });
+            }
+            if (t >= 108.95 && t <= 109.1 && !isScrub) {
+              triggerCallout('khen-ko', 'KHEN KO!', '#a855f7', true);
+              audioEngine.playEvent('khen-ko-sfx', 'ko');
+            }
+          }
+
+          const khenKnock = t >= 106.4 ? clamp((t - 106.4) / 1.8, 0, 1) : 0;
+          if (t >= 109.0) {
+            poseFighter(fighters.khen, getKOPose(-9.8, 0, 1.57));
+          } else {
+            poseFighter(fighters.khen, {
+              x: lerp(-5.8, -9.8, khenKnock),
+              y: khenKnock * 0.16,
+              z: 0,
+              rotY: 1.57,
+              leanX: khenKnock > 0 ? -1.4 : 0.28,
+              torsoPitch: 0.25,
+              eyeState: t >= 105.8 ? 'shock' : 'fierce',
+              auraOpacity: 0.92,
+              active: true,
+              armLAngle: [-1.45, -0.35, -0.25],
+              elbowL: -0.3,
+              armRAngle: [-1.45, 0.35, 0.25],
+              elbowR: -0.3,
+              thighL: [-0.45, 0, -0.15],
+              kneeL: 0.65,
+              thighR: [0.4, 0, 0.15],
+              kneeR: 0.55
+            });
+          }
+
+          const isFiring = t >= 105.0;
+          poseFighter(fighters.jm, {
+            x: 6.2,
+            y: jmY,
+            z: 0,
+            rotY: -1.57,
+            leanX: isFiring ? 0.24 : -0.18,
+            torsoYaw: isFiring ? 0 : 0.55,
+            eyeState: 'fierce',
+            auraOpacity: 1.0,
+            active: true,
+            armLAngle: isFiring ? [-1.57, 0.12, -0.14] : [-0.85, 0.55, -0.3],
+            elbowL: isFiring ? -0.12 : -1.45,
+            armRAngle: isFiring ? [-1.57, -0.12, 0.14] : [-0.85, -0.55, 0.3],
+            elbowR: isFiring ? -0.12 : -1.45,
+            thighL: [-0.55, 0, -0.15],
+            kneeL: 0.85,
+            thighR: [0.35, 0, 0.15],
+            kneeR: 0.45
+          });
+
+          if (t < 101.0) {
+            camDest.set(0, 4.5, 16.0);
+            lookDest.set(0, 2.0, 0);
+          } else if (t < 105.0) {
+            camDest.set(3.2, jmY + 1.8, 6.2);
+            lookDest.set(6.0, jmY + 1.25, 0);
+          } else {
+            camDest.set(0.2, 4.4, 15.8);
+            lookDest.set(-0.5, 1.8, 0);
+          }
+        }
+
+        // ======================================================================
+        // ACT 8 (110.0s – 120.0s): CHAMPION JM — GOLDEN SUNRISE & VICTORY POSE
+        // ======================================================================
+        else {
+          poseFighter(fighters.marjohn, getKOPose(-19.2, -3.5, 1.57));
+          poseFighter(fighters.prime,   getKOPose(18.2, -2.0, 1.57));
+          poseFighter(fighters.damen,   getKOPose(7.5, 6.2, -0.8));
+          poseFighter(fighters.khen,    getKOPose(-9.8, 0, 1.57));
+
+          document.getElementById('champion-banner').classList.remove('hidden');
+          if (t >= 110.1 && t <= 110.3 && !isScrub) {
+            triggerMilestone('champion-fanfare', () => {
+              audioEngine.playEvent('champion-fanfare', 'victory');
+              spawnShockwave(0, 0, 16.0, 0xfacc15, 1.15);
+            });
+          }
+
+          const descP = smoothstep(110.0, 112.5, t);
+          const jmX = lerp(6.2, 0, descP);
+          const jmY = lerp(3.4, 0, descP);
+
+          if (fighters.jm.crownHalo) {
+            fighters.jm.crownHalo.visible = true;
+            fighters.jm.crownHalo.rotation.z = t * 1.1;
+            fighters.jm.crownHalo.scale.setScalar(1.08 + Math.sin(t * 4) * 0.05);
+          }
+
+          poseFighter(fighters.jm, {
+            x: jmX,
+            y: jmY,
+            z: 0,
+            rotY: lerp(-1.57, 0.12, descP),
+            leanX: -0.05,
+            leanZ: 0.04,
+            hipY: -0.04,
+            torsoYaw: -0.14,
+            headYaw: 0.12,
+            eyeState: 'normal',
+            auraOpacity: 0.78,
+            active: true,
+            // Signature Double-Finger-Gun Smirk Pose!
+            armLAngle: [-1.42, 0.25, -0.22],
+            elbowL: -0.35,
+            armRAngle: [-1.48, -0.22, 0.18],
+            elbowR: -0.32,
+            thighL: [-0.18, 0.12, -0.10],
+            kneeL: 0.28,
+            thighR: [0.16, -0.12, 0.12],
+            kneeR: 0.24
+          });
+
+          // Wide battlefield aftermath orbit revealing damaged ruins, cliff rubble, scorched scar & Champion JM
+          const orbitWin = (t - 110.0) * 0.22;
+          const camRad = lerp(12.5, 5.4, smoothstep(110.0, 114.5, t));
+          camDest.set(Math.sin(orbitWin) * camRad, lerp(4.8, 2.05, smoothstep(110.0, 114.5, t)), Math.cos(orbitWin) * camRad);
+          lookDest.set(0, 1.32, 0);
+        }
+
+        // Update Fighter HUD Cards
+        FIGHTER_CONFIGS.forEach((cfg) => {
+          const f = fighters[cfg.id];
+          const card = document.getElementById(`hud-card-${cfg.id}`);
+          const hpBar = document.getElementById(`hud-hp-${cfg.id}`);
+          const hpNum = document.getElementById(`hud-hp-num-${cfg.id}`);
+          const koBadge = document.getElementById(`hud-ko-${cfg.id}`);
+
+          hpBar.style.width = `${Math.round(f.hp)}%`;
+          hpNum.textContent = `${Math.round(f.hp)}%`;
+          if (f.isKO) {
+            koBadge.classList.remove('hidden');
+            card.style.opacity = '0.52';
+            card.style.transform = 'scale(0.97)';
+          } else {
+            koBadge.classList.add('hidden');
+            card.style.opacity = '1.0';
+            card.style.transform = f.isActive ? 'scale(1.03)' : 'scale(1.0)';
+            card.style.boxShadow = f.isActive ? `0 0 18px ${cfg.color}55` : '';
+          }
+        });
+
+        // Update Camera Position according to Selected Mode ('auto' | 'orbit' | 'jm')
+        camShakeSpring.update(dt);
+        const shakeOffset = (Math.random() - 0.5) * camShakeSpring.value;
+
+        if (cameraMode === 'auto') {
+          camPosSpring.setTarget(camDest.x, camDest.y, camDest.z);
+          camLookSpring.setTarget(lookDest.x, lookDest.y, lookDest.z);
+          camPosSpring.update(dt);
+          camLookSpring.update(dt);
+          camera.position.set(
+            camPosSpring.x.value + shakeOffset,
+            camPosSpring.y.value + shakeOffset * 0.7,
+            camPosSpring.z.value
+          );
+          camera.lookAt(camLookSpring.x.value, camLookSpring.y.value, camLookSpring.z.value);
+        } else if (cameraMode === 'orbit') {
+          const r = orbitState.radius;
+          const sinPhi = Math.sin(orbitState.phi);
+          const cosPhi = Math.cos(orbitState.phi);
+          camera.position.set(
+            orbitState.target.x + r * sinPhi * Math.sin(orbitState.theta) + shakeOffset,
+            orbitState.target.y + r * cosPhi,
+            orbitState.target.z + r * sinPhi * Math.cos(orbitState.theta)
+          );
+          camera.lookAt(orbitState.target);
+        } else if (cameraMode === 'jm') {
+          const jmPos = fighters.jm.root.position;
+          const r = 6.8;
+          camera.position.set(
+            jmPos.x + Math.sin(orbitState.theta + 0.35) * r + shakeOffset,
+            jmPos.y + 2.4,
+            jmPos.z + Math.cos(orbitState.theta + 0.35) * r
+          );
+          camera.lookAt(jmPos.x, jmPos.y + 1.25, jmPos.z);
+        }
+      }
+
+      // ------------------------------------------------------------------------
+      // 15. LIGHTWEIGHT 60 FPS VFX & AMBIENCE UPDATE LOOP
+      // ------------------------------------------------------------------------
+      function updateVisualEffects(dt, elapsed) {
+        for (let i = activeShockwaves.length - 1; i >= 0; i--) {
+          const sw = activeShockwaves[i];
+          sw.age += dt;
+          if (sw.age >= sw.maxAge) {
+            activeShockwaves.splice(i, 1);
+          } else {
+            sw.radius = lerp(0.5, sw.maxRadius, sw.age / sw.maxAge);
+          }
+        }
+        shockwaveRingPool.forEach((ring, idx) => {
+          if (idx < activeShockwaves.length) {
+            const sw = activeShockwaves[idx];
+            ring.visible = true;
+            ring.position.set(sw.x, getTerrainHeight(sw.x, sw.z) + 0.14, sw.z);
+            ring.scale.setScalar(sw.radius);
+            ring.material.color.setHex(sw.colorHex);
+            ring.material.opacity = (1.0 - sw.age / sw.maxAge) * 0.72;
+          } else {
+            ring.visible = false;
+          }
+        });
+
+        slashArcPool.forEach((s) => {
+          if (s.life > 0) {
+            s.life -= dt;
+            const ratio = Math.max(0, s.life / s.maxLife);
+            s.mesh.material.opacity = ratio * 0.9;
+            s.mesh.scale.multiplyScalar(1.0 + dt * 1.4);
+            if (s.life <= 0) s.mesh.visible = false;
+          }
+        });
+
+        hitSparkPool.forEach((sp) => {
+          if (sp.life > 0) {
+            sp.life -= dt;
+            sp.mesh.position.x += sp.vx * dt;
+            sp.mesh.position.y += sp.vy * dt;
+            sp.mesh.position.z += sp.vz * dt;
+            sp.vy -= 18.0 * dt;
+            sp.mesh.material.opacity = Math.max(0, sp.life / sp.maxLife);
+            if (sp.life <= 0) sp.mesh.visible = false;
+          }
+        });
+
+        ghostPool.forEach((g) => {
+          if (g.life > 0) {
+            g.life -= dt;
+            g.mesh.material.opacity = Math.max(0, (g.life / 0.28) * 0.5);
+            if (g.life <= 0) g.mesh.visible = false;
+          }
+        });
+
+        // Gentle wind sway on perimeter trees (22 meshes = zero CPU cost)
+        swayingTrees.forEach((tr) => {
+          tr.crown.rotation.z = Math.sin(elapsed * 1.4 + tr.phase) * 0.045;
+          tr.crown.rotation.x = Math.cos(elapsed * 1.1 + tr.phase) * 0.035;
+        });
+
+        cloudsGroup.children.forEach((cl) => {
+          cl.userData.angle += cl.userData.speed * dt;
+          cl.position.x = Math.cos(cl.userData.angle) * cl.userData.radius;
+          cl.position.z = Math.sin(cl.userData.angle) * cl.userData.radius;
+        });
+
+        const pArr = pollenGeo.attributes.position.array;
+        for (let i = 0; i < POLLEN_COUNT; i++) {
+          pArr[i * 3] += (0.45 + Math.sin(elapsed + i) * 0.2) * dt;
+          pArr[i * 3 + 1] += Math.sin(elapsed * 1.5 + i * 0.7) * 0.18 * dt;
+          if (pArr[i * 3] > 26) pArr[i * 3] = -26;
+        }
+        pollenGeo.attributes.position.needsUpdate = true;
+
+        streamMat.emissiveIntensity = 0.22 + Math.sin(elapsed * 3.0) * 0.08;
+
+        fireworks.forEach((fw) => {
+          const age = simTime - fw.triggerTime;
+          if (simTime >= 110.0 && age >= 0 && age < 2.4) {
+            fw.points.material.opacity = 1.0 - age / 2.4;
+            const arr = fw.points.geometry.attributes.position.array;
+            for (let p = 0; p < fw.dirs.length; p++) {
+              const d = fw.dirs[p];
+              arr[p * 3] = fw.origin.x + d.x * age * 4.8;
+              arr[p * 3 + 1] = fw.origin.y + d.y * age * 4.8 - 1.2 * age * age;
+              arr[p * 3 + 2] = fw.origin.z + d.z * age * 4.8;
+            }
+            fw.points.geometry.attributes.position.needsUpdate = true;
+          } else {
+            fw.points.material.opacity = 0;
+          }
+        });
+      }
+
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      let lastFrameTime = performance.now();
+      let totalElapsed = 0;
+
+      updateSimulation(0.016, true);
+
+      function animate(now) {
+        requestAnimationFrame(animate);
+        const rawDt = Math.min((now - lastFrameTime) / 1000, 0.05);
+        lastFrameTime = now;
+        totalElapsed += rawDt;
+
+        const mangaEl = document.getElementById('manga-flash');
+        if (mangaFlashTimer > 0) {
+          mangaFlashTimer -= rawDt;
+          mangaEl.style.opacity = '1';
+        } else {
+          mangaEl.style.opacity = '0';
+        }
+
+        let effectiveDt = rawDt * playbackSpeed;
+        if (hitStopTimer > 0) {
+          hitStopTimer -= rawDt;
+          effectiveDt = 0;
+        }
+
+        if (isPlaying) {
+          simTime += effectiveDt;
+          if (simTime >= TOTAL_DURATION) {
+            simTime = TOTAL_DURATION;
+            setPlayingState(false);
+          }
+          updateSimulation(effectiveDt > 0 ? effectiveDt : 0.001, false);
+        } else {
+          updateSimulation(rawDt, true);
+        }
+
+        updateVisualEffects(rawDt, totalElapsed);
+        renderer.render(scene, camera);
+      }
+
+      requestAnimationFrame(animate);
+    };
+  </script>
+</body>
+</html>

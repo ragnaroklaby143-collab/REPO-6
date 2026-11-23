@@ -1,0 +1,146 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Koopal Clash player profile synced via Google Sign-In with live presence, coins, career stats, and bounded recent match history.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID matching the document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google account email.",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Player Google display name or fighter tag.",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "Google profile avatar URL.",
+          "maxLength": 512
+        },
+        "role": {
+          "type": "string",
+          "enum": ["player", "admin"],
+          "description": "Account role; client self-registration always starts as player."
+        },
+        "onlineStatus": {
+          "type": "string",
+          "enum": ["online", "in-match", "offline"],
+          "description": "Live lobby/arena presence state."
+        },
+        "coins": {
+          "type": "integer",
+          "description": "Persistent arena Coin balance."
+        },
+        "googleBonusClaimed": {
+          "type": "boolean",
+          "description": "True once the one-time +1,000 Google sign-in Coins bonus has been awarded."
+        },
+        "wins": {
+          "type": "integer",
+          "description": "Total career match wins."
+        },
+        "losses": {
+          "type": "integer",
+          "description": "Total career match losses."
+        },
+        "totalKOs": {
+          "type": "integer",
+          "description": "Total career knockouts."
+        },
+        "matchesPlayed": {
+          "type": "integer",
+          "description": "Total completed matches."
+        },
+        "favoriteFighter": {
+          "type": "string",
+          "enum": ["marjohn", "prime", "damen", "khen", "jm"],
+          "description": "Most recently or frequently played fighter."
+        },
+        "unlockedSkins": {
+          "type": "array",
+          "description": "Purchased fighter:skin unlock keys."
+        },
+        "equippedSkins": {
+          "type": "object",
+          "description": "Equipped skinId per fighterId."
+        },
+        "matchHistory": {
+          "type": "array",
+          "description": "Bounded list (max 15) of recent match summaries."
+        },
+        "banned": {
+          "type": "boolean",
+          "description": "Moderation flag toggled by Admin Monitor."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of first registration (immutable)."
+        },
+        "lastLogin": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of latest login or activity update."
+        }
+      },
+      "required": [
+        "uid",
+        "email",
+        "displayName",
+        "photoURL",
+        "role",
+        "onlineStatus",
+        "coins",
+        "wins",
+        "losses",
+        "totalKOs",
+        "matchesPlayed",
+        "favoriteFighter",
+        "matchHistory",
+        "banned",
+        "createdAt",
+        "lastLogin"
+      ]
+    },
+    "AdminRoleRecord": {
+      "title": "AdminRoleRecord",
+      "description": "Optional explicit admin membership marker keyed by Firebase UID.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        }
+      },
+      "required": ["uid", "email"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Player profiles containing Google identity, online status, coin wallet, stats, and bounded match history."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRoleRecord" },
+      "description": "Optional admin registry supporting RBAC lookup alongside verified sullenshades@gmail.com."
+    }
+  }
+}
